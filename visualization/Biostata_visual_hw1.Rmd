@@ -1,0 +1,65 @@
+---
+title: "Biostat Visualization HW №1"
+author: "Liliya Golubnikova"
+date: "2022-10-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Загружаем библиотеки
+```{r message=FALSE, warning=FALSE}
+install.packages(c('dplyr', 'ggplot2'))
+install.packages('openxlsx')
+library(dplyr)
+library(ggplot2)
+```
+# 1. Загрузим данные для работы
+
+```{r}
+insurance_cost <- read.csv('data/insurance_cost.csv', stringsAsFactors = T)
+# Можно загрузить точно такие же данные, но в формате Excel
+#pima1 <- openxlsx::read.xlsx('pima.xlsx')
+
+head(insurance_cost)
+```
+
+# 2. Гистограммы всех нумерических переменных 
+
+Гистограммы:
+
+```{r pressure, echo=FALSE}
+hist(insurance_cost$age)
+hist(insurance_cost$bmi)
+hist(insurance_cost$children)
+hist(insurance_cost$charges)
+```
+# 3. График плотности по колонке charges
+Отметьте вертикальные линии  средней и медианы на графике. Раскрасьте текст и линии средней и медианы разными цветами. Добавьте текстовые пояснения значения средней и медианы. Подберите тему для графика. Назовите оси.
+
+```{r}
+# Найдём среднюю
+charges_mean <- round(mean(insurance_cost$charges),1)
+
+# Найдем медиану
+charges_median <- round(median(insurance_cost$charges),1)
+
+
+ggplot(data = insurance_cost, 
+       aes(x = charges)) +
+  geom_density() +
+  geom_vline(aes(xintercept = charges_mean)) + #Вертикальная линия
+  annotate("text", 
+           x= charges_mean, 
+           y=0.10, 
+           color = "orange",
+           label=paste0("Mean=", charges_mean)) +
+  geom_vline(aes(xintercept = charges_median)) +
+  annotate("text", 
+           x= charges_median, 
+           y=0.015, 
+           color = "blue",
+           label=paste0("Median=", charges_median))
+```
