@@ -49,17 +49,27 @@ charges_median <- round(median(insurance_cost$charges),1)
 
 ggplot(data = insurance_cost, 
        aes(x = charges)) +
-  geom_density() +
-  geom_vline(aes(xintercept = charges_mean)) + #Вертикальная линия
+  geom_histogram(bins = 50) 
+
+ggplot(data = insurance_cost, 
+       aes(x = charges)) +
+  geom_density() 
+  
+ggplot() +
+  geom_density(data = insurance_cost, aes(x = charges)) +
+  geom_vline(aes(xintercept = charges_mean, linetype = "dashed", colour = "red")) + #Вертикальная линия
   annotate("text", 
-           x= charges_mean, 
-           y=0.10, 
-           color = "orange",
+           x = charges_mean+15, 
+           y = 0.000010, 
+           color = "red",
            label=paste0("Mean=", charges_mean)) +
-  geom_vline(aes(xintercept = charges_median)) +
+  geom_vline(aes(xintercept = charges_median, linetype = "dashed", colour = "blue")) +
   annotate("text", 
-           x= charges_median, 
-           y=0.015, 
+           x = charges_median+50, 
+           y = 0.0000015, 
            color = "blue",
-           label=paste0("Median=", charges_median))
+           label = paste0("Median=", charges_median)) +
+    theme_minimal()
+
+
 ```
