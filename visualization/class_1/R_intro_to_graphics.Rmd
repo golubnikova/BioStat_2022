@@ -38,8 +38,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, warning=FALSE}
 # Если у вас не установлены какие-то из библиотек ниже, то установить их можно следующей командой. Эти библиотеки пригодятся нам во время занятия, но подгружать в library() мы их будем тогда, когда будем затрагивать соответствующую тему.
-install.packages(c('dplyr', 'ggplot2'))
-install.packages('openxlsx')
+#install.packages(c('dplyr', 'ggplot2'))
+#install.packages('openxlsx')
 library(dplyr)
 library(ggplot2)
 ```
@@ -53,7 +53,7 @@ library(ggplot2)
 ```{r}
 pima <- read.csv('pima.csv', stringsAsFactors = T)
 # Можно загрузить точно такие же данные, но в формате Excel
-pima1 <- openxlsx::read.xlsx('pima.xlsx')
+pima <- openxlsx::read.xlsx('pima.xlsx')
 
 head(pima)
 ```
@@ -112,7 +112,7 @@ table(pima$age_group)
 
 Посмотрим теперь на данные с помощью библиотеки по их удобному представлению - skimr
 ```{r}
- install.packages("skimr")
+#install.packages("skimr")
 library(skimr)
 skim(pima)
 ```
@@ -640,7 +640,7 @@ bar <- ggplot() +
 
 Загрузим библиотеку и объединим графики:
 ```{r}
- install.packages('ggpubr')
+#install.packages('ggpubr')
 library(ggpubr)
 
 combine_plot <- ggarrange(scatter, bar,
