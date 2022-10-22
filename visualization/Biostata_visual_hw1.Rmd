@@ -11,11 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Загружаем библиотеки
 ```{r message=FALSE, warning=FALSE}
-install.packages(c('dplyr', 'ggplot2'))
-install.packages('openxlsx')
+#install.packages(c('dplyr', 'ggplot2'))
+#install.packages('openxlsx')
 library(dplyr)
 library(ggplot2)
-install.packages('ggpubr')
+#install.packages('ggpubr')
 library(ggpubr)
 ```
 # 1. Загрузим данные для работы
@@ -33,10 +33,21 @@ head(insurance_cost)
 Гистограммы:
 
 ```{r pressure, echo=FALSE}
+png("results/age_hist.png")
 hist(insurance_cost$age)
+dev.off()
+
+png("results/bmi_hist.png")
 hist(insurance_cost$bmi)
+dev.off()
+
+png("results/children_hist.png")
 hist(insurance_cost$children)
+dev.off()
+
+png("results/charges_hist.png")
 hist(insurance_cost$charges)
+dev.off()
 ```
 # 3. График плотности по колонке charges
 Отметьте вертикальные линии  средней и медианы на графике. Раскрасьте текст и линии средней и медианы разными цветами. Добавьте текстовые пояснения значения средней и медианы. Подберите тему для графика. Назовите оси.
@@ -79,6 +90,13 @@ density <- insurance_cost %>%
     title = element_text(size = 12), # Задаем стандартный размер текста для любого элемента графика
     )
 
+ggsave(
+  plot = density, # Какой объект хотим сохранить?
+  "results/charges_density.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
 ```
 
 # 4. График box-plot по распределению уровня зарплаты у мужчин/женщин; курильщиков/некурильщиков; людей проживающих в разных регионах 
@@ -113,6 +131,29 @@ boxplot3 <- ggplot() +
     title = element_text(size = 12), # Задаем стандартный размер текста для любого элемента графика
     axis.title.y = element_text(size=14) # Задаём размер для названия оси y отдельно + 
     )
+
+#Сохранение картинок в png-формате
+ggsave(
+  plot = boxplot1, # Какой объект хотим сохранить?
+  "results/charges_sex_bx.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
+ggsave(
+  plot = boxplot2, # Какой объект хотим сохранить?
+  "results/charges_smokers_bx.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
+ggsave(
+  plot = boxplot3, # Какой объект хотим сохранить?
+  "results/charges_region_bx.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
 ```
 
 # 5. Объединение графиков, полученных в №3,4
@@ -121,8 +162,16 @@ boxplot3 <- ggplot() +
 
 combine_plot <- ggarrange(density, boxplot1, boxplot2, boxplot3, ncol = 1, nrow = 4)
 
-annotate_figure(combine_plot, 
+combine_plot <- annotate_figure(combine_plot, 
                 top = text_grob("Распределение ур-ней з/п в зависимости от различных факторов", face = "bold", size = 14))
+
+#Сохранение картинок в png-формате
+ggsave(
+  plot = combine_plot, # Какой объект хотим сохранить?
+  "results/combine_plot.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
 
 ```
 
@@ -130,17 +179,25 @@ annotate_figure(combine_plot,
 
 ```{r}
 
-insurance_cost %>% 
+faset <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = sex, y = charges, color = region, fill = region, group = region)) + 
   geom_point() +
   facet_grid(. ~ region) +
   theme_minimal()
 
+#Сохранение картинок в png-формате
+ggsave(
+  plot = faset, # Какой объект хотим сохранить?
+  "results/region_faset.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
 ```
 # 7-9. Scatter plot отношения переменных age и charges, добавляем колонку smoker
 ```{r}
-insurance_cost %>% 
+scatter_plot1 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = age, y = charges, color = age)) + 
     geom_point(size=3) +
@@ -148,7 +205,7 @@ insurance_cost %>%
  ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
  theme(axis.text.x = element_text(size = 14)) 
 
-insurance_cost %>% 
+scatter_plot2 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = age, y = charges, color = age)) + 
     geom_point(size=3) +
@@ -161,7 +218,7 @@ insurance_cost %>%
               se=TRUE) # Используем ли доверительные интервалы?
 
 #9. Разбиваем предыдущий график по колонке smoker
-insurance_cost %>% 
+scatter_plot3 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(
     x = age,
@@ -178,11 +235,33 @@ insurance_cost %>%
  ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
  theme(axis.text.x = element_text(size = 14))
 
+
+#Сохранение картинок в png-формате
+ggsave(
+  plot = scatter_plot1, # Какой объект хотим сохранить?
+  "results/charge_age_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
+ggsave(
+  plot = scatter_plot2, # Какой объект хотим сохранить?
+  "results/charge_age_trendLine_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
+ggsave(
+  plot = scatter_plot3, # Какой объект хотим сохранить?
+  "results/charge_age_smoker_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
 ```
 
 # 10. Scatter plot отношения переменных bmi и charges, добавляем колонку smoker
 ```{r}
-insurance_cost %>% 
+scatter_plot4 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = bmi, y = charges, color = bmi)) + 
     geom_point(size=3) +
@@ -190,7 +269,7 @@ insurance_cost %>%
  ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
  theme(axis.text.x = element_text(size = 14)) 
 
-insurance_cost %>% 
+scatter_plot5 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = bmi, y = charges, color = bmi)) + 
     geom_point(size=3) +
@@ -203,8 +282,7 @@ insurance_cost %>%
               se=TRUE) # Используем ли доверительные интервалы?
 
 
-#bmi_sp <- 
-  insurance_cost %>% 
+ scatter_plot6 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(
     x = bmi,
@@ -221,15 +299,35 @@ insurance_cost %>%
  ggtitle('Scatter plot отношения переменных возраста и зарплаты для курящих/некурящих') +
  theme(axis.text.x = element_text(size = 14))
 
+#Сохранение картинок в png-формате
 ggsave(
-  plot = sex_age_violin, # Какой объект хотим сохранить?
-  "sex_age_violin.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  plot = scatter_plot4, # Какой объект хотим сохранить?
+  "results/charge_bmi_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
+ggsave(
+  plot = scatter_plot5, # Какой объект хотим сохранить?
+  "results/charge_bmi_trendLine_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  width = 8.5, # Ширина картинки
+  height = 9, # Высота картинки
+  dpi = 1000) # Качество - dots per inch
+
+ggsave(
+  plot = scatter_plot6, # Какой объект хотим сохранить?
+  "results/charge_bmi_smoker_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
 
 ```
-#11. Задайте вопрос к данным №1 (вопрос должен быть про какую-то подвыборку  данных). Ответьте на него построив график на подвыборке данных. График должен  содержать все основные элементы оформления (название, подписи осей, тему и  проч.). Аргументируйте выбор типа графика. 
+
+#11. Вопрос к данным №1.
+Вопрос должен быть про какую-то подвыборку  данных. Ответьте на него построив график на подвыборке данных. График должен  содержать все основные элементы оформления (название, подписи осей, тему и  проч.). Аргументируйте выбор типа графика. 
+
+Вопрос: 
+какой поло-возрастной состав анализируемый выборки?
 
 Цель: 
 определить поло-возрастной состав данных с целью оценки репрезентативности выборки, а также оценки применимости результатов анализа на других индивидуумах.
@@ -244,19 +342,11 @@ sex_age_violin <- ggplot(insurance_cost) +
 
 ggsave(
   plot = sex_age_violin, # Какой объект хотим сохранить?
-  "sex_age_violin.png", # Название файла + указываем формат (можно указать другие популярные форматы)
+  "results/sex_age_violin.png", # Название файла + указываем формат (можно указать другие популярные форматы)
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
 ```
-# Сохранение графиков
 
-```{r}
-ggsave(
-  plot = sex_age_violin, # Какой объект хотим сохранить?
-  "sex_age_violin.png", # Название файла + указываем формат (можно указать другие популярные форматы)
-  width = 8.5, # Ширина картинки
-  height = 9, # Высота картинки
-  dpi = 1000) # Качество - dots per inch
 
-```
+
