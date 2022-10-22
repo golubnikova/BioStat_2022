@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r message=FALSE, warning=FALSE}
 install.packages(c('dplyr', 'ggplot2'))
 install.packages('openxlsx')
+install.packages('ggpubr')
+library(ggpubr)
 library(dplyr)
 library(ggplot2)
 ```
@@ -49,17 +51,186 @@ charges_median <- round(median(insurance_cost$charges),1)
 
 ggplot(data = insurance_cost, 
        aes(x = charges)) +
-  geom_density() +
-  geom_vline(aes(xintercept = charges_mean)) + #Вертикальная линия
+  geom_histogram(bins = 50) 
+
+ggplot(data = insurance_cost, 
+       aes(x = charges)) +
+  geom_density() 
+  
+density <- insurance_cost %>% 
+  ggplot() +
+  geom_density(aes(x = charges)) +
+  ylab(expression(bold(density))) +
+  xlab(expression(bold(charges))) +
+  geom_vline(aes(xintercept = charges_mean), color = "red") + #Вертикальная линия
   annotate("text", 
-           x= charges_mean, 
-           y=0.10, 
-           color = "orange",
+           x = charges_mean-90, 
+           y = 0.000010, 
+           color = "red",
            label=paste0("Mean=", charges_mean)) +
-  geom_vline(aes(xintercept = charges_median)) +
+  geom_vline(aes(xintercept = charges_median), color = "green") + #Вертикальная линия
   annotate("text", 
-           x= charges_median, 
-           y=0.015, 
-           color = "blue",
-           label=paste0("Median=", charges_median))
+           x = charges_median+150, 
+           y = 0.0000015, 
+           color = "green",
+           label = paste0("Median=", charges_median)) +
+    theme_minimal()+
+    theme( # Ниже идут настройки тем (их огромное количество, но мы меняем лишь две)
+    title = element_text(size = 12), # Задаем стандартный размер текста для любого элемента графика
+    )
+
+```
+
+# 4. График box-plot по распределению уровня зарплаты у мужчин/женщин; курильщиков/некурильщиков; людей проживающих в разных регионах 
+box_plot по отношению переменных charges и (1) sex (2) smoker (3) region. Подберите тему для графика. Назовите оси
+```{r}
+boxplot1 <- ggplot() +
+  geom_boxplot(data = insurance_cost, 
+               aes(x = charges, y = sex)) +
+  theme_light() +
+  labs(x = 'charges', y = 'sex') +
+  theme( # Ниже идут настройки тем (их огромное количество, но мы меняем лишь две)
+    title = element_text(size = 12), # Задаем стандартный размер текста для любого элемента графика
+    axis.title.y = element_text(size=14) # Задаём размер для названия оси y отдельно + 
+    )
+
+boxplot2 <- ggplot() +
+  geom_boxplot(data = insurance_cost, 
+               aes(x = charges, y = smoker)) +
+  theme_light() +
+  labs(x = 'charges', y = 'smokers') +
+  theme( # Ниже идут настройки тем (их огромное количество, но мы меняем лишь две)
+    title = element_text(size = 12), # Задаем стандартный размер текста для любого элемента графика
+    axis.title.y = element_text(size=14) # Задаём размер для названия оси y отдельно + 
+    )
+
+boxplot3 <- ggplot() +
+  geom_boxplot(data = insurance_cost, 
+               aes(x = charges, y = region)) +
+  theme_light() +
+  labs(x = 'charges', y = 'region') +
+  theme( # Ниже идут настройки тем (их огромное количество, но мы меняем лишь две)
+    title = element_text(size = 12), # Задаем стандартный размер текста для любого элемента графика
+    axis.title.y = element_text(size=14) # Задаём размер для названия оси y отдельно + 
+    )
+```
+
+# 5. Объединение графиков, полученных в №3,4
+
+```{r}
+
+combine_plot <- ggarrange(density, boxplot1, boxplot2, boxplot3, ncol = 1, nrow = 4)
+
+annotate_figure(combine_plot, 
+                top = text_grob("Распределение ур-ней з/п в зависимости от различных факторов", face = "bold", size = 14))
+
+```
+
+# 6. Фасет графика №3 по колонке region
+
+```{r}
+
+insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(x = sex, y = charges, color = region, fill = region, group = region)) + 
+  geom_point() +
+  facet_grid(. ~ region) +
+  theme_minimal()
+
+```
+# 7-9. Scatter plot отношения переменных age и charges, добавляем колонку smoker
+```{r}
+insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(x = age, y = charges, color = age)) + 
+    geom_point(size=3) +
+ theme_minimal() +
+ ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
+ theme(axis.text.x = element_text(size = 14)) 
+
+insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(x = age, y = charges, color = age)) + 
+    geom_point(size=3) +
+ theme_minimal() +
+ ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
+ theme(axis.text.x = element_text(size = 14)) +
+  geom_smooth(method=lm, # Выбираем модель. Стандартно - линейная модель
+              color="red", fullrange = T,
+              fill="#69b3a2", 
+              se=TRUE) # Используем ли доверительные интервалы?
+
+#9. Разбиваем предыдущий график по колонке smoker
+insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(
+    x = age,
+    y = charges,
+    color = smoker,
+    fill = smoker,
+    group = smoker)) + 
+    geom_point(size=3) +
+  geom_smooth(method=lm, # Выбираем модель. Стандартно - линейная модель
+              color="red", fullrange = T,
+              fill="#69b3a2", 
+              se=TRUE) + # Используем ли доверительные интервалы?
+ theme_minimal() +
+ ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
+ theme(axis.text.x = element_text(size = 14))
+
+```
+
+# 10. Scatter plot отношения переменных bmi и charges, добавляем колонку smoker
+```{r}
+insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(x = bmi, y = charges, color = bmi)) + 
+    geom_point(size=3) +
+ theme_minimal() +
+ ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
+ theme(axis.text.x = element_text(size = 14)) 
+
+insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(x = bmi, y = charges, color = bmi)) + 
+    geom_point(size=3) +
+ theme_minimal() +
+ ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
+ theme(axis.text.x = element_text(size = 14)) +
+  geom_smooth(method=lm, # Выбираем модель. Стандартно - линейная модель
+              color="red", fullrange = T,
+              fill="#69b3a2", 
+              se=TRUE) # Используем ли доверительные интервалы?
+
+
+insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(
+    x = bmi,
+    y = charges,
+    color = smoker,
+    fill = smoker,
+    group = smoker)) + 
+    geom_point(size=3) +
+  geom_smooth(method=lm, # Выбираем модель. Стандартно - линейная модель
+              color="red", fullrange = T,
+              fill="#69b3a2", 
+              se=TRUE) + # Используем ли доверительные интервалы?
+ theme_minimal() +
+ ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
+ theme(axis.text.x = element_text(size = 14))
+
+```
+#11. Задайте вопрос к данным №1 (вопрос должен быть про какую-то подвыборку  данных). Ответьте на него построив график на подвыборке данных. График должен  содержать все основные элементы оформления (название, подписи осей, тему и  проч.). Аргументируйте выбор типа графика. 
+
+Цель: 
+определить поло-возрастной состав данных с целью оценки репрезентативности выборки, а также оценки применимости результатов анализа на других индивидуумах.
+Violin plot наиболее наглядно показывает, есть ли какие-то перекосы в выборке по возрасту, 
+а также позволяет наглядно увидеть распределение возрастов среди мужчин и женщин независимо.
+
+```{r}
+ggplot(insurance_cost) +
+  geom_violin(aes(x = sex, y = age, color = sex, fill = sex), 
+              trim = FALSE) + 
+  ggtitle('Поло-возрастной состав')
 ```

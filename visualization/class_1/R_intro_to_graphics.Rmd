@@ -112,7 +112,7 @@ table(pima$age_group)
 
 Посмотрим теперь на данные с помощью библиотеки по их удобному представлению - skimr
 ```{r}
-# install.packages("skimr")
+ install.packages("skimr")
 library(skimr)
 skim(pima)
 ```
@@ -288,7 +288,7 @@ glucose_mean <- round(mean(pima$glucose),1)
 
 ggplot(data = pima, 
        aes(x = glucose)) +
-  geom_`density() +
+  geom_density() +
   geom_vline(aes(xintercept = glucose_mean)) + #Вертикальная линия
   annotate("text", 
            x= glucose_mean+30, 
