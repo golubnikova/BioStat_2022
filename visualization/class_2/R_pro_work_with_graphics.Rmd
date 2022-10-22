@@ -110,7 +110,7 @@ plot_ly(
                 width = 2)
   )
 )   %>%
-  layout(
+  layout( #настраиваем вывод подписей
     title = 'Отношение уровня глюкозы и инсулина в данных PIMA',
     yaxis = list(title = 'Уровень глюкозы',
                  zeroline = FALSE),  # Уберём выделения нулевых осей по y
@@ -183,7 +183,7 @@ plot_ly(data = pima[(pima$insulin != 0) & (pima$glucose != 0),],
 
 ```{r}
 pal <- c("red", "blue", "green")
-pal <- setNames(pal, levels(gapminder_2007$age_group))
+pal <- setNames(pal, levels(pima$age_group)) #age_group - должнабыть факторная. Число цветов в pal должно соответствовать числу уровней фактора.
 
 plot_ly(data = pima[(pima$insulin != 0) & (pima$glucose != 0),],
         x = ~ insulin,
@@ -237,7 +237,12 @@ plot_ly(
 В чанке ниже напишите код 3d графика ао осям age, mass, pressure:
 
 ```{r}
-
+plot_ly(
+  data = pima[(pima$age != 0) & (pima$mass != 0) & (pima$pressure != 0),],
+  x = ~ age,
+  y = ~ mass,
+  color = ~pressure
+)
 ```
 
 
@@ -272,7 +277,23 @@ ggplotly(plot)
 В чанке ниже напишите код любого графика и сделайте его интерактивным:
 
 ```{r}
-
+plot1 <- insurance_cost %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(
+    x = age,
+    y = charges,
+    color = smoker,
+    fill = smoker,
+    group = smoker)) + 
+    geom_point(size=3) +
+  geom_smooth(method=lm, # Выбираем модель. Стандартно - линейная модель
+              color="red", fullrange = T,
+              fill="#69b3a2", 
+              se=TRUE) + # Используем ли доверительные интервалы?
+ theme_minimal() +
+ ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
+ theme(axis.text.x = element_text(size = 14))
+ggplotly(plot1)
 ```
 
 
