@@ -7,12 +7,11 @@ output:
     keep_md: true
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+
 
 # Загружаем библиотеки
-```{r message=FALSE, warning=FALSE}
+
+```r
 #install.packages(c('dplyr', 'ggplot2'))
 #install.packages('openxlsx')
 library(dplyr)
@@ -22,7 +21,8 @@ library(ggpubr)
 ```
 # 1. Загрузим данные для работы
 
-```{r}
+
+```r
 insurance_cost <- read.csv('data/insurance_cost.csv', stringsAsFactors = T)
 # Можно загрузить точно такие же данные, но в формате Excel
 #pima1 <- openxlsx::read.xlsx('pima.xlsx')
@@ -30,31 +30,45 @@ insurance_cost <- read.csv('data/insurance_cost.csv', stringsAsFactors = T)
 head(insurance_cost)
 ```
 
+```
+##   age    sex    bmi children smoker    region   charges
+## 1  19 female 27.900        0    yes southwest 16884.924
+## 2  18   male 33.770        1     no southeast  1725.552
+## 3  28   male 33.000        3     no southeast  4449.462
+## 4  33   male 22.705        0     no northwest 21984.471
+## 5  32   male 28.880        0     no northwest  3866.855
+## 6  31 female 25.740        0     no southeast  3756.622
+```
+
 # 2. Гистограммы всех нумерических переменных 
 
 Гистограммы:
 
-```{r pressure, echo=FALSE}
-png("results/age_hist.png")
-hist(insurance_cost$age)
-dev.off()
 
-png("results/bmi_hist.png")
-hist(insurance_cost$bmi)
-dev.off()
+```
+## png 
+##   2
+```
 
-png("results/children_hist.png")
-hist(insurance_cost$children)
-dev.off()
+```
+## png 
+##   2
+```
 
-png("results/charges_hist.png")
-hist(insurance_cost$charges)
-dev.off()
+```
+## png 
+##   2
+```
+
+```
+## png 
+##   2
 ```
 # 3. График плотности по колонке charges
 Отметьте вертикальные линии  средней и медианы на графике. Раскрасьте текст и линии средней и медианы разными цветами. Добавьте текстовые пояснения значения средней и медианы. Подберите тему для графика. Назовите оси.
 
-```{r}
+
+```r
 # Найдём среднюю
 charges_mean <- round(mean(insurance_cost$charges),1)
 
@@ -65,11 +79,19 @@ charges_median <- round(median(insurance_cost$charges),1)
 ggplot(data = insurance_cost, 
        aes(x = charges)) +
   geom_histogram(bins = 50) 
+```
 
+![](Biostata_visual_hw1_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+```r
 ggplot(data = insurance_cost, 
        aes(x = charges)) +
   geom_density() 
-  
+```
+
+![](Biostata_visual_hw1_files/figure-html/unnamed-chunk-3-2.png)<!-- -->
+
+```r
 density <- insurance_cost %>% 
   ggplot() +
   geom_density(aes(x = charges)) +
@@ -98,12 +120,12 @@ ggsave(
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
-
 ```
 
 # 4. График box-plot по распределению уровня зарплаты у мужчин/женщин; курильщиков/некурильщиков; людей проживающих в разных регионах 
 box_plot по отношению переменных charges и (1) sex (2) smoker (3) region. Подберите тему для графика. Назовите оси
-```{r}
+
+```r
 boxplot1 <- ggplot() +
   geom_boxplot(data = insurance_cost, 
                aes(x = charges, y = sex)) +
@@ -155,13 +177,12 @@ ggsave(
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
-
 ```
 
 # 5. Объединение графиков, полученных в №3,4
 
-```{r}
 
+```r
 combine_plot <- ggarrange(density, boxplot1, boxplot2, boxplot3, ncol = 1, nrow = 4)
 
 combine_plot <- annotate_figure(combine_plot, 
@@ -174,13 +195,12 @@ ggsave(
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
-
 ```
 
 # 6. Фасет графика №3 по колонке region
 
-```{r}
 
+```r
 faset <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = sex, y = charges, color = region, fill = region, group = region)) + 
@@ -195,10 +215,10 @@ ggsave(
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
-
 ```
 # 7-9. Scatter plot отношения переменных age и charges, добавляем колонку smoker
-```{r}
+
+```r
 scatter_plot1 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = age, y = charges, color = age)) + 
@@ -252,7 +272,13 @@ ggsave(
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
+```
 
+```
+## `geom_smooth()` using formula 'y ~ x'
+```
+
+```r
 ggsave(
   plot = scatter_plot3, # Какой объект хотим сохранить?
   "results/charge_age_smoker_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
@@ -261,8 +287,13 @@ ggsave(
   dpi = 1000) # Качество - dots per inch
 ```
 
+```
+## `geom_smooth()` using formula 'y ~ x'
+```
+
 # 10. Scatter plot отношения переменных bmi и charges, добавляем колонку smoker
-```{r}
+
+```r
 scatter_plot4 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = bmi, y = charges, color = bmi)) + 
@@ -315,14 +346,23 @@ ggsave(
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
+```
 
+```
+## `geom_smooth()` using formula 'y ~ x'
+```
+
+```r
 ggsave(
   plot = scatter_plot6, # Какой объект хотим сохранить?
   "results/charge_bmi_smoker_sp.png", # Название файла + указываем формат (можно указать другие популярные форматы)
   width = 8.5, # Ширина картинки
   height = 9, # Высота картинки
   dpi = 1000) # Качество - dots per inch
+```
 
+```
+## `geom_smooth()` using formula 'y ~ x'
 ```
 
 #11. Вопрос к данным №1.
@@ -336,7 +376,8 @@ ggsave(
 Violin plot наиболее наглядно показывает, есть ли какие-то перекосы в выборке по возрасту, 
 а также позволяет наглядно увидеть распределение возрастов среди мужчин и женщин независимо.
 
-```{r}
+
+```r
 sex_age_violin <- ggplot(insurance_cost) +
   geom_violin(aes(x = sex, y = age, color = sex, fill = sex), 
               trim = FALSE) + 
