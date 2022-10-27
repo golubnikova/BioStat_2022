@@ -1,7 +1,7 @@
 ---
 title: "Biostat Visualization HW №1"
 author: "Liliya Golubnikova"
-date: "2022-10-22"
+date: "2022-10-27"
 output: 
   html_document:
     keep_md: true
@@ -116,27 +116,32 @@ ggplot(data = insurance_cost,
 ![](Biostata_visual_hw1_files/figure-html/unnamed-chunk-4-2.png)<!-- -->
 
 ```r
-insurance_cost %>% 
+density <- insurance_cost %>% 
   ggplot() +
   geom_density(aes(x = charges)) +
+  scale_x_log10() +
   ylab(expression(bold(density))) +
   xlab(expression(bold(charges))) +
   geom_vline(aes(xintercept = charges_mean), color = "red") + #Вертикальная линия
   annotate("text", 
-           x = charges_mean-90, 
-           y = 0.000010, 
+           x = charges_mean+8000, 
+           y = 1.3, 
            color = "red",
            label=paste0("Mean=", charges_mean)) +
-  geom_vline(aes(xintercept = charges_median), color = "green") + #Вертикальная линия
+  geom_vline(
+    aes(xintercept = charges_median), color = "green"
+    ) + #Вертикальная линия
   annotate("text", 
-           x = charges_median+150, 
-           y = 0.0000015, 
+           x = charges_median+5000, 
+           y = 1.5, 
            color = "green",
-           label = paste0("Median=", charges_median)) +
+           label = paste0("Median=", charges_median)
+           ) +
     theme_minimal()+
     theme( # Ниже идут настройки тем (их огромное количество, но мы меняем лишь две)
     title = element_text(size = 12), # Задаем стандартный размер текста для любого элемента графика
     )
+density
 ```
 
 ![](Biostata_visual_hw1_files/figure-html/unnamed-chunk-4-3.png)<!-- -->
@@ -196,17 +201,12 @@ boxplot3
 
 
 ```r
-combine_plot <- ggarrange(density, boxplot1, boxplot2, boxplot3, ncol = 1, nrow = 4)
-```
+boxplot_united <- ggarrange(boxplot1, boxplot2, boxplot3, nrow = 1, ncol = 3)
 
-```
-## Warning: Package `gridGraphics` is required to handle base-R plots. Substituting
-## empty plot.
-```
+combine_plot <- ggarrange(density, boxplot_united , nrow = 2, ncol = 1)
 
-```r
 combine_plot <- annotate_figure(combine_plot, 
-                top = text_grob("Распределение ур-ней страх.выплат в зависимости от различных факторов", face = "bold", size = 14))
+                top = text_grob("Распределение ур-ней страховых выплат \n в зависимости от различных факторов", face = "bold", size = 14))
 
 combine_plot
 ```
@@ -215,16 +215,22 @@ combine_plot
 
 # 6. Фасет графика, полученного в №3 по колонке region
 
+Фасеты это разбивка графика по какой-то категориальной переменной на два или больше графиков (в зависимости от числа категорий в переменной). В результате на каждом графике отображается подвыборка какого-то значения категории. 
+
 
 ```r
-faset <- insurance_cost %>% 
-  #filter(mass != 0 & triceps != 0) %>% 
-  ggplot(aes(x = sex, y = charges, color = region, fill = region, group = region)) + 
-  geom_point() +
+charges_by_region <- insurance_cost %>% 
+  ggplot() +
+  geom_density(aes(x = charges, fill = region), alpha = 0.5) +
+  scale_x_log10() +
+  theme(legend.position="none") +
+  labs(x ="Charges") +
   facet_grid(. ~ region) +
   theme_minimal()
 
-faset
+  
+  
+charges_by_region
 ```
 
 ![](Biostata_visual_hw1_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
@@ -366,11 +372,7 @@ scatter_plot6
 ![](Biostata_visual_hw1_files/figure-html/unnamed-chunk-9-3.png)<!-- -->
 
 
-# 11. Вопрос к данным №1.
-Вопрос должен быть про какую-то подвыборку  данных. Ответьте на него построив график на подвыборке данных. График должен  содержать все основные элементы оформления (название, подписи осей, тему и  проч.). Аргументируйте выбор типа графика. 
-
-**Вопрос:**   
-какой поло-возрастной состав анализируемый выборки?
+# 11. Вопрос к данным №1. Какой поло-возрастной состав анализируемый выборки?
 
 **Цель:**   
 определить поло-возрастной состав данных с целью оценки репрезентативности выборки, а также оценки применимости результатов анализа на других индивидуумах.
@@ -391,10 +393,7 @@ sex_age_violin
 
 ![](Biostata_visual_hw1_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
 
-# 12. Вопрос к данным №2.
-
-**Вопрос:**   
-по каким возрастным категориям больше всего страховых выплат у страховой компании?
+# 12. Вопрос к данным №2.По каким возрастным категориям больше всего страховых выплат у страховой компании?
 
 Cделаем переменную возрастных категорий:
 
