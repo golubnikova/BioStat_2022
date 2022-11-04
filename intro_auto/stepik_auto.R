@@ -6,7 +6,10 @@
 # inner_join(x, y): включает все строки, которые есть и в x и y;
 # full_join(x, y): просто включает все строки, которые есть хотя бы в x или y.
 
-data <- read_tsv("../intro_auto/data_tsv.tsv")
+library('readr')
+library('dplyr')
+library(stringr)
+data <- read_tsv("intro_auto/data_tsv.tsv")
 
 library(stringr)
 data %>% select(`Пол`, `Группа`, `Базофилы_E1`)
@@ -15,4 +18,8 @@ data %>% select(`Группа`, function(x) !is.factor(x))
 data %>% select(`Группа крови`, `Возраст`, function(x) anyNA(x))
 data %>% select(`Группа`, (function(x) is.factor(x)) | where(function(x) is.numeric(x)))
 
+?across
 
+data %>% mutate(across(!contains("E1"), function(x) str_c(x, " + некая строка")))
+
+data %>% mutate(across(!contains("E1") & !c(`Группа`, `Возраст`) & !where(is.factor), function(x) x ^ 2), across(contains("E2"), function(x) x * 100))

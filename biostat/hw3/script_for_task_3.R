@@ -7,6 +7,9 @@
 # Input: df
 # Output: df_finish
 
+library('readr')
+library('dplyr')
+
 cycles <- c(2,3,4) # Количество циклов химиотерапии для дебют+рецидив (из задания 2)
 pr <- c(0.125, 0.500, 0.375) # Веротяности для циклов терапии дебют+рецидив (из задания 2)
 df <- data.frame(cycles, pr) # Дата-фрейм
@@ -40,7 +43,4 @@ standard_deviation_3 <- sqrt(variance_3)
 se_3 <- standard_deviation1/sqrt(n3)
 
 df_finish <- data.frame(N = c(n1,n2,n3), SE = c(se_1, se_2, se_3))
-
-library('readr')
-library('dplyr')
 df_finish %>% write_delim("hw3/task3_df.xls", delim = "\t")
