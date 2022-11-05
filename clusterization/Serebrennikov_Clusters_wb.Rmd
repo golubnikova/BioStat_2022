@@ -1,0 +1,851 @@
+---
+title: 'Визуализация данных в R'
+subtitle: "Методы кластеризации"
+author: "Серебренников Дмитрий"
+date: '05.11.2022'
+output:
+  html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F)
+```
+
+
+
+&nbsp;
+
+
+Загрузим билиотеки для работы:
+
+```{r}
+set.seed(42)
+
+# install.packages(c("stats", "cluster", "factoextra", "clustertend", "dendextend", "NbClust", "fpc", "dbscan"))
+
+library(dplyr)
+library(ggplot2)
+library(stats)
+library(cluster)
+library(factoextra)
+library(clustertend)
+library(dendextend)
+library(NbClust)
+library(fpc)
+library(dbscan)
+```
+
+&nbsp;
+
+
+...
+
+&nbsp;
+
+# Что такое кластеризация?
+
+Кластеризация - разбиение наблюдений на подмножества (кластеры) таким образом, чтобы наблюдения из одного кластера были более похожи друг на друга, чем на наблюдения из
+других кластеров по какому-либо критерию. 
+
+Визуально это выглядит так:
+
+<div align="center">
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("clust_example_2.png")
+```
+</div>
+
+&nbsp;
+
+Кластеризация относится к моделям обучения без учителя. Т.е. мы можем либо не знать сколько у нас получится кластеров по итогам, либо (в ряде подметодов) контролировать их количество вручную:
+
+<div align="center">
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("clust_example_1.jpg")
+```
+</div>
+
+&nbsp;
+
+Прежде чем начать, отметим ряд особенностей кластеризации:
+
+* Не существует универсального алгоритма кластеризации. Алгоритмов достаточно много. Сегодня мы расммотрим четыре самых популярных из них;
+* Нужно быть осторожным с интерпретацией кластерного анализа - далеко не всегда можно искренне считать, что получившиеся кластеры отражают структуру данных;
+* Данные должны быть нормированы
+* Отдельные кластеры можно выбраковывать
+* Cостав и количество кластеров зависит от выбираемых переменных. Изменение переменных влияет на кластеры
+* Данные о кластеризации полезны, если вы после успешной кластеризации будете присваивать данным переменную с номером кластера и работать с ней дальше при анализе.
+
+&nbsp;
+
+...
+
+Работать будем с данными двумя датасетами. Учебным датасет ирисов Фишера и реальными данными о [страновых показателях систем здравоохранения](https://www.kaggle.com/datasets/danevans/world-bank-wdi-212-health-systems). И в том и в другом случае мы будем наблюдать достаточно выраженные кластеры (что бывает далеко не всегда).
+
+Загрузим датасеты:
+
+```{r}
+# Ирисы
+iris <- iris |> 
+  select(is.numeric)
+
+# Системы здравоохранения
+hs <- read.csv('Health_systems.csv')
+rownames(hs) <- hs$World_Bank_Name
+# Уберём дамми переменные и переменную с большим количеством миссингов. Оставим только полностью заполненные строки
+hs_num <- hs |> 
+  select(-c(Country_Region, Province_State, World_Bank_Name, `Completeness_of_death_reg_2008.16`)) |> 
+  na.omit()
+
+# Стандартизируем объекты для подсчёта и переведём их матрицу
+iris_scaled <- scale(iris)
+hs_scaled <- scale(hs_num)
+```
+
+&nbsp;
+
+# Иерархическая кластеризация (hierarchical clustering) 
+
+В основном к ней относится два вида алгоритмов: 
+ 
+* Agglomerative Nesting (agnes) - каждое наблюдение находит ближайшее себе по дистанции до него (по каждой из переменных). После нахождения первого соседа, начинатся следующий шаг, когда образовавшийся мини-кластер ищет другие ближайшие к ним кластеры/наблюдения. Так прохожит несколько шагов, пока все наблюдения не сольются в один кластер.
+* Divisive Analysis Clustering (diana) - обратный способ. Мы отталкиваемся от одного кластера всех наблюдений и ищем непохожие друг на друга наблюдения и делим один кластер на два. Затем алгоритм продолжается до конца.
+
+Посмотрим визуально:
+
+<div align="center">
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("Iris_dendrogram.png")
+```
+</div>
+"Длинна" дистанции обозначает меру схожести/разницы наблюдений - Высоту/Height (Крестовский остров ближе к Институт биоинформатики чем к Кудрово).
+
+...
+
+
+Разница между agnes и diana:
+
+<div align="center">
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("Agglo-DIANA.png")
+```
+</div>
+
+
+Мы будем рассматривать первый тип.
+
+&nbsp;
+
+
+&nbsp;
+
+...
+
+### Как это работает?
+
+1. Создаём матрицу дистанций
+
+```{r}
+hs_dist <- dist(hs_scaled,
+                       method = "euclidean")
+as.matrix(hs_dist)[1:6, 1:6]
+
+iris_dist <- dist(iris_scaled,
+                  method = "euclidean")
+as.matrix(iris_dist)[1:6, 1:6]
+```
+
+**Основные типы дистанций**:
+
+* "euclidean" - Евклидова дистанция. Прямой путь между точками в евклидовом пространстве.
+* "manhattan" - Манхэттенская дистанция. Сумма модулей разностей координат двух точек.
+* "pearson"/"spearman"/"kendall" - Корреляционные дистанции. Схожесть между наблюдениями высчитывается по корреляции их характеристик (даже если наблюдаемые значения могут сильно отличаться друг от друга с точки зрения евклидова расстояния). Расстояние между двумя объектами равно 0, когда они идеально скоррелированы. Используется при кластеризации генов. Здесь необходимо не забывать разную специфику методов корреляции.  
+* "cosine" - Дистанция по косинусному расстоянию между точками в многомерном пространстве. Не присутствует в базовом функционале dist(), но легко прописывается вручную, либо из пакетов lsa::cosine(), stylo::cosine.dist(). (в моём мире) Используется для предобработки текстов для анализа (NLP).
+* "gower" - Для смешанных типов данных (с наличием дамми, факторов и проч.) используется дистанцию Говера ("gower") из пакета cluster. Пример:
+
+```{r}
+# Предустановленный датасет характеристик 18 видов цветов
+flower
+flower_gower <- cluster::daisy(flower,
+                               metric = "gower")
+```
+
+* etc. - [Здесь](https://rstudio-pubs-static.s3.amazonaws.com/599072_93cf94954aa64fc7a4b99ca524e5371c.html) также хорошо разобраны отличия методов
+
+&nbsp;
+
+
+2. Высчитываем дендрограмму кластеров. 
+
+```{r}
+hs_dist.hc <- hclust(d = hs_dist,
+                     method = "ward.D2")
+```
+
+
+method - аналог функции связи, т.е. каким образом мы объединяем данные в кластеры. К основным относятся:
+
+| **Method** |                                                              **Process**                                                              |                                        **Result**                                        |
+|:----------:|:-------------------------------------------------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------------------------:|
+|  `single`  |                                  Measures the distance between the two closest points in each cluster                                 |             Generally better for identifying outliers that don’t cluster well            |
+| `complete` |                               Measures the distance between the two most distant points in each cluster                               |                            Generally produces tighter clusters                           |
+| `centroid` |                                        Measures the distance between the center of each cluster                                       |                  Generally works better for data with fewer similarities                 |
+|  `median`  |                                    Measures the median distance between each cluster’s median point                                   |  Similar to centroid, but weighted toward where the majority of observations are located |
+|  `average` | Measures the average (mean) distance between each observation in each cluster, weighted by the number of observations in each cluster |          Generally similar to complete linkage, better at incorporating outliers         |
+| `mcquitty` |                          Similar to average, but does not take number of points in the cluster into account.                          |                            Generally similar to single linkage                           |
+|  `ward.D`  |        Minimizes within cluster variance (sum of errors). Clusters are combined according to smallest between cluster distance.       |                         Generally produces more compact clusters                         |
+|  `ward.D2` |                                Same as ward.D, but the differences are squared (sum of squared errors)                                | Emphasizes the differences identified in ward.D, making clusters easier to differentiate |
+
+&nbsp;
+
+
+3. Визуализируем
+
+```{r}
+fviz_dend(hs_dist.hc, 
+          cex = 0.6) # cex() - размер лейблов
+```
+
+4. Оценить качество кластеризации. 
+
+*Метрики оценки качества будут в завершении занятия*
+
+&nbsp;
+
+
+5. Перебрав несколько вариантов метрик и методов останавливаемся на самом лучшем
+
+...
+
+
+&nbsp;
+
+## Работа с дендрограмой
+
+Как поделить дендрограмму на кластеры? Допустим, мы решили, что нам нужно 4 кластера, тогда:
+
+```{r}
+hs_dist.hc_k3 <- cutree(hs_dist.hc, 
+                          k = 3) # Создаём вектор принадлежности к кластерам
+
+# Смотрим результат
+head(hs_dist.hc_k3, n = 4)
+table(hs_dist.hc_k3) 
+```
+
+Можем установить линию тршэшхолда для кластеров вручную:
+
+```{r}
+hs_dist.hc_h20 <- cutree(hs_dist.hc, h=20)  # Создаём вектор принадлежности к кластерам
+
+# Смотрим результат
+table(hs_dist.hc_h20) 
+```
+
+
+&nbsp;
+
+
+Варианты визуализации:
+
+
+1. 
+
+```{r}
+fviz_dend(hs_dist.hc, 
+          k = 3, # Задаём число кластеров
+          cex = 0.5, # Задаем размер лейблов
+          k_colors = c("#2E9FDF", "#E7B800", "#FC4E07"),
+          color_labels_by_k = TRUE, # Соотнести цвета с кластерами
+          rect = TRUE # Добавить "квадратик" вокруг групп
+)
+```
+
+&nbsp;
+
+2.
+
+
+```{r}
+fviz_cluster(list(data = hs_dist, cluster = hs_dist.hc_h20),
+             palette = c("#2E9FDF", "#E7B800", "#FC4E07"),
+             ellipse.type = "convex", # Объединить кластеры элипсом
+             repel = TRUE, # Избежать наслоения лейблов
+             show.clust.cent = FALSE, # Показывать центр кластера
+             ggtheme = theme_minimal())
+```
+
+&nbsp;
+
+3.
+
+```{r}
+
+fviz_dend(hs_dist.hc, 
+          k = 3, 
+          cex = 0.5, 
+          k_colors = c("#2E9FDF", "#E7B800", "#FC4E07"),
+          color_labels_by_k = TRUE, 
+          rect = TRUE, 
+          rect_border = c("#2E9FDF", "#E7B800", "#FC4E07"), # Добавить цвет для границы "квадратика"
+          rect_fill = TRUE) # Закрасить внутреннюю часть "квадратика"
+
+```
+
+&nbsp;
+
+4. Горизонтальная дендрограмма
+
+```{r}
+fviz_dend(hs_dist.hc, 
+          cex = 0.5, 
+          horiz = TRUE)
+```
+
+&nbsp;
+
+5. Раскрашиваем горизонтальную дендрограмму
+
+```{r}
+fviz_dend(hs_dist.hc, 
+          k = 3, 
+          cex = 0.4, 
+          horiz = TRUE, 
+          k_colors = "jco",
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE)
+```
+
+&nbsp;
+
+6. Круговая дендрограмма
+
+```{r}
+fviz_dend(hs_dist.hc, 
+          cex = 0.5, 
+          k = 3,
+          k_colors = "jco", 
+          type = "circular")
+```
+
+&nbsp;
+
+7. Древовидная дендрограмма
+
+```{r}
+fviz_dend(hs_dist.hc, 
+          k = 3, 
+          k_colors = "jco",
+          type = "phylogenic", 
+          repel = TRUE) # Избежать наслоения лейблов
+```
+
+8. Приближение на участок дендрограммы
+
+```{r}
+hc_plot <- fviz_dend(hs_dist.hc, 
+                       k = 3, 
+                       cex = 0.5, 
+                       k_colors = "jco"
+)
+dend_data <- attr(hc_plot, 
+                  "dendrogram") # Извлекаем данные по дендрограмме
+
+# Разрезаем по высоте h = 20
+dend_cuts <- cut(dend_data, h = 20)
+# Смотрим верхнюю часть графика
+fviz_dend(dend_cuts$upper)
+```
+
+Нижнюю мы сразу посмотреть не можем, т.к. мы теперь имеем дело с 3 независимыми дендрограммами...
+
+9. Выведение отдельной ветви дендрограммы
+
+```{r}
+fviz_dend(dend_cuts$lower[[1]], 
+          main = "Кластер 1")
+# Plot subtree 2
+fviz_dend(dend_cuts[["lower"]][[2]][[2]][[1]], 
+          main = "Кластер 2 (одна из нижних ветвей)")
+
+```
+
+
+&nbsp;
+
+
+##  Как выбрать количество кластеров?
+
+Метрики выбора числа кластеров будут описаны в разделе Partitioning Clustering 
+
+&nbsp;
+
+## Альтернативный способ анализа с помощью пакета cluster 
+
+cluster представляет также представляет удобный функционал для работы с деревьями. Его пример ниже:
+
+```{r}
+library(cluster)
+# Agnes
+hs.agnes <- agnes(x = hs_dist, 
+                   stand = F, # Стандартизировать данные?
+                   metric = "euclidean", 
+                   method = "ward" )
+
+# Diana
+hs.diana <- diana(x = hs_dist, 
+                   stand = F, 
+                   metric = "euclidean")
+
+fviz_dend(hs.agnes, cex = 0.6, k = 3)
+fviz_dend(hs.diana, cex = 0.6, k = 3)
+```
+
+
+
+&nbsp;
+
+# Partitioning Clustering
+
+## kMeans
+
+Общая идея:
+
+1. Случайным образом задаём n-ое количество точек. Число n выбираем сами (как это сделать - ниже). Эти точки называем центроидами - геометрическими центрами кластеров
+2. Для всех точек-наблюдений определяем, к какому центроиду они ближе. Благодаря этому, мы образуем кластер вокруг центроида
+3. Перемещаем каждый центроид в геометрический центр точек его кластера (изначально же наблюдения включались просто по факту того, что центроид был ближе, а не "центральнее")
+4. Пересчитываем точки, которые в таком, новом положении центроида попали в его кластер
+5. Курсируем между шагом 3 и 4 до тех пор, пока в результате нового движения ни одна из точек не поменяет принадлежность к какому-либо кластеру
+
+Как это выглядит визуально:
+
+<div align="center">
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("kmeans_example_1.png")
+```
+</div>
+
+&nbsp;
+
+Посмотрим движение центроида на [видео](https://www.youtube.com/watch?v=nXY6PxAaOk0&ab_channel=JohanHagelb%C3%A4ck).
+
+...
+
+А можно ли доверять такому способу кластеризации k-means?
+
+Нет, всегда надо быть на чеку. Разберёмся почему на [этом сайте](https://www.naftaliharris.com/blog/visualizing-k-means-clustering/).
+
+...
+
+Считать kMeans просто:
+
+```{r}
+hs_kmean <- kmeans(hs_num,
+                          centers = 3, # Количество центроидов-кластеров
+                          iter.max = 10, # Максимальное количество итераций-шагов центроидов
+                          nstart = 35) # Какое количество центроидов сгенерировать в начале? Потом автоматически алгоритм сократит их до числа centers, оставив только лучшие. Рекомендуется ставить между 25 и 50, чтобы найти стабильное решение
+
+head(hs_kmean)
+```
+
+&nbsp;
+
+
+
+### Как выбрать количество кластеров/центроидов?
+
+#### Метод локтя
+
+Возьмем метрику подсчета суммы квадратов (total within sum of squares) каждого из кластеров. 
+
+После того, как мы кластеризовали данные, мы можем посмотреть какое значение будет получаться если сложить все дистанции от центроида до всех наблюдений в кластере. Дальше, мы можем добавлять по одному новому кластеру и смотреть как падает расстояние...
+
+**А оно всегда будет падать, понимаете почему?**
+
+И здесь может сложиться две ситуации, которые хорошо иллюстрируются в сравнении данных по системам здравоохранения с данными ирисов. Посчитаем как будут падать суммы квадратов для каждого датасета с возрастанием числа кластеров:
+
+```{r}
+# hs
+fviz_nbclust(hs_scaled, kmeans, method = "wss") + 
+  ggtitle('Health Systems dataset')
+# iris
+fviz_nbclust(iris_scaled, kmeans, method = "wss") +
+  ggtitle('Iris dataset')
+```
+
+
+Посмотрите на разницу. Во втором случае после 3го кластера "обрушение" значения сумм квадратов прекращается. Это значит, что именно это число - оптимально для kMeans. Через поиск таких углов и находbтся нужное количество кластеров. Сами углы называются "локти" (elbow), а метод - **метод локтя**.
+
+Наличие локтя говорит о наличии выраженных кластеров в данных. Но вот в случае систем здравоохранения мы имеем гладкую линию - выраженных кластеров нет, всё становится сложнее. Стоит прибегнуть к другим методам оценки
+
+&nbsp;
+
+#### Коэффициент силуэта (silhouette)
+
+Коэффициент силуэта подсчитывает расстояние между точкой и другими точками её кластера и соседних кластеров.  
+Огрубляя, можно сказать, что значение силуэта показывает, насколько плотно в среднем в каждом кластере одна точка окружена другими относящимися к тому же кластеру. Т.е. если кластер сильно разряжен (что говорит о том, что на самом деле в действительности он может кластером и не быть), то значение будет низким (-1), если наоборот, все наблюдения кучкуются вокруг друг друга, а дистанция до других кластеров велика, то значение будет высоким (1)
+
+
+```{r}
+# hs
+fviz_nbclust(hs_scaled, kmeans, method = "silhouette") + 
+  ggtitle('Health Systems dataset')
+# iris
+fviz_nbclust(iris_scaled, kmeans, method = "silhouette") +
+  ggtitle('Iris dataset')
+```
+
+&nbsp;
+
+
+&nbsp;
+
+
+#### Gap statistics
+
+Измеряет, насколько отличается распределение на кластеры наших данных от рандомных стандартизированных данных той же размерности работает через бутстрэп. Хорошо схватывает данные с ярко выраженными кластерами.
+
+```{r}
+fviz_nbclust(USArrests, 
+             kmeans, 
+             nstart = 25, 
+             method = "gap_stat", 
+             nboot = 50)+ # Количество выборок для бутстрепа. Используется только для определения количества кластеров
+  labs(subtitle = "Gap statistic method")
+```
+
+```{r}
+# hs
+fviz_nbclust(hs_scaled, 
+             kmeans,
+             nstart = 25,
+             method = "gap_stat",
+             nboot = 50) + # Количество выборок для бутстрепа.
+  ggtitle('Health Systems dataset')
+# iris
+fviz_nbclust(iris_scaled, 
+             kmeans,
+             nstart = 25,
+             method = "gap_stat",
+             nboot = 50) + # Количество выборок для бутстрепа.
+  ggtitle('Iris dataset')
+```
+
+&nbsp;
+
+#### Перебор метрик
+
+Метрик много и есть функции их перебора с выводом лучшего числа кластеров по сумме оценок: 
+
+```{r}
+nb <- NbClust(hs_scaled, 
+              distance = "euclidean", 
+              min.nc = 2, # Минимальное число кластеров
+              max.nc = 10, # Максимальное
+              method = "kmeans")
+fviz_nbclust(nb)
+```
+
+&nbsp;
+
+...
+
+Итого останавливаемся на 3 кластерах. Визуализируем:
+
+```{r}
+hs_scaled_kmean3 <- kmeans(hs_scaled, 3, nstart = 25) 
+
+fviz_cluster(hs_scaled_kmean3, data = hs_scaled,
+                          palette = c("#2E9FDF", "#E7B800", "#FC4E07"),
+             ellipse.type = "euclid", 
+             star.plot = T,  # Проводим линии принадлежности точек к центроиду кластера
+             repel = TRUE, 
+             ggtheme = theme_minimal())
+
+# Без линий
+fviz_cluster(hs_scaled_kmean3, data = hs_scaled,
+                          palette = c("#2E9FDF", "#E7B800", "#FC4E07"),
+             ellipse.type = "euclid", 
+             star.plot = F,  # Не проводим линии
+             repel = TRUE, 
+             ggtheme = theme_minimal())
+```
+
+
+&nbsp;
+
+
+## K-Medoids | Partitioning Around Medoids (PAM)
+
+То же самое что и kMeans, но теперь считаем не по средним значениям, а по медианному наблюдению в кластере.
+
+```{r}
+hs.pam <- pam(hs_scaled, 
+               k = 3, 
+               metric = "euclidean", 
+               stand = FALSE) # Стандартизировать?
+
+fviz_cluster(
+  hs.pam,
+  data = hs_scaled,
+  palette = c("#2E9FDF", "#E7B800", "#FC4E07"),
+  ellipse.type = "euclid",
+  star.plot = F,
+  # Не проводим линии
+  repel = TRUE,
+  ggtheme = theme_minimal()
+)
+
+# Сравним kMean и kMedoids
+table(hs.pam$clustering, 
+      hs_scaled_kmean3$cluster)
+```
+
+
+&nbsp;
+
+
+**НО,есть одна серьёзная проблема с разобранными методами**
+
+```{r}
+data(multishapes)
+df <- multishapes[, 1:2]
+km.res <- kmeans(df, 5, nstart = 25)
+fviz_cluster(km.res, df, geom = "point",
+             ellipse= FALSE, show.clust.cent = FALSE,
+             palette = "jco", ggtheme = theme_classic())
+```
+
+**Классические алгоритмы не чувствительны к кластерам сложной формы и нелинейным связям внутри. Для таких задач нужен другой метод**
+
+&nbsp;
+
+
+# DBSCAN 
+
+Общий принцип:
+
+1. Произвольно выберем точку p
+2. Присвоим к её кластеру все точки, в радиусе EPS. Для каждой из них сделаем тоже самое и так до тех пор, пока на новом шаге в радиус не попадёт ни одна точка. Здесь тажке важен параметр манимального количества точек, попадающего в радиус Min Pts (чем он больше, тем гуще будут наши кластеры)
+3. После того как один кластер сложился, случайным образом назначается вторая точка. Из неё строится второй клстер
+4. Шаг 3 идёт до тех пор, пока новые точки-основы-кластеров не смогут образовать новый кластер (вокруг них ничего нет или число точек меньше чем Min Pts). В этом случае мы помечаем оставшиеся точки как шум
+
+Визуально, это выглядит так: 
+
+<div align="center">
+```{r, echo=FALSE, out.width = '100%'}
+knitr::include_graphics("dbscan_example.png")
+```
+</div>
+
+
+&nbsp;
+
+Ещё раз о терминах:
+
+
+что что значит
+
+<div align="center">
+```{r, echo=FALSE, out.width = '50%'}
+knitr::include_graphics("dbscan_1.png")
+```
+</div>
+
+<div align="center">
+```{r, echo=FALSE, out.width = '60%'}
+knitr::include_graphics("dbscan_2.png")
+```
+</div>
+
+
+&nbsp;
+
+Посмотрим как работает DBSCAN на [этом сайте](https://www.naftaliharris.com/blog/visualizing-dbscan-clustering/).
+
+
+Как это применяется:
+
+```{r}
+# Health systems
+hs.db <- fpc::dbscan(hs_scaled,
+                  eps = 1.8, # Радиус
+                  MinPts = 5) # Количество точек в пределах радиуса. Минимальное значение 3
+hs.db
+
+# Iris
+iris.db <- fpc::dbscan(iris_scaled,
+                  eps = 0.6, # Радиус
+                  MinPts = 7) 
+iris.db
+```
+
+```{r}
+# HS
+fviz_cluster(hs.db, data = hs_scaled, stand = FALSE,
+             ellipse = FALSE, show.clust.cent = FALSE,
+             geom = "point", palette = "jco", ggtheme = theme_classic())
+
+# Iris
+fviz_cluster(iris.db, data = iris_scaled, stand = FALSE,
+             ellipse = FALSE, show.clust.cent = FALSE,
+             geom = "point", palette = "jco", ggtheme = theme_classic())
+```
+
+&nbsp;
+
+Как выбрать eps? Нужно посчитать среднюю дистанцию между точкой и ближайшими соседями (опять ищем локти)
+
+```{r}
+dbscan::kNNdistplot(hs_scaled, 
+                    k = 5) # Число соседей - чем меньше, тем более сгруппированные кластеры мы хотим получить
+dbscan::kNNdistplot(iris, 
+                    k = 3)
+```
+
+&nbsp;
+
+Как определить оптимальные minPts? Единого способа нет, стоит смотреть экспериментально, с учётом следующего:
+
+* Чем больше набор данных, тем больше должно быть значение MinPts
+* Если набор данных разряженный, выберайте большее значение MinPts
+* Для двумерных данных используйте значение MinPts = 4 (Ester et al., 1996)
+* Если ваши данные имеют более двух измерений, выберите MinPts = 2*dim(x)[2], где dim - размерность ваших изначальных данных (Sander et al., 1998).
+
+...Экспериментируйте!
+
+&nbsp;
+
+**Плюсы DBSCAN**
+
+* Не требует от нас предварительного определения количества кластеров, таких как KMeans.
+* Обрабатывает выбросы как чемпион
+* Может разделять данные с высокой плотностью на небольшие кластеры
+* Может кластеризовать нелинейные отношения (находит произвольные формы)
+
+**Минусы DBSCAN**
+
+* Проблемы с идентификацией кластеров в данных различной плотности.
+* Могут пострадать данные с высокой размерностью
+* Очень чувствителен к параметрам epsilon и минимальным точкам
+
+
+
+
+&nbsp;
+
+# Оценки кластеризации
+
+Что даёт нам утверждать, что алгоритм действительно хорошо сработал и нашёл кластеры?
+
+## Для иерархических кластеризаций
+
+Один из способов оценки иерархической кластеризации - измерить, насколько хорошо дерево кластеров, сгенерированное функцией hclust(), отражает ваши данные. В базовом варианте анализируют корреляцию cophentic distance данных кластеризации с оригинальной матрицей дистанций.
+
+Если кластеризация прошла хорошо (конвенционально больше 0.75), то, считается, кластеризация прошла хорошо.
+
+```{r}
+# Cophentic distance
+hs_dist.coph <- cophenetic(hs_dist.hc)
+# Корреляция
+cor(hs_dist, hs_dist.coph)
+```
+
+
+
+## Методы оценки наличия кластеров в данных
+
+### Статистический - тест Хопкинса (Hopkins statistic)
+
+<div align="center">
+```{r, echo=FALSE, out.width = '20%'}
+knitr::include_graphics("Hopkins_stat.png")
+```
+</div>
+
+
+Hopkins statistic - Считаем расстояние до ближайшего соседа для каждой точки, потом сравниваем суммарные расстояния со сгенерированным стандартизированным датасетом той же размерности.  
+
+* Нулевая гипотезза - Данные распределены равномерно, т.е. кластеров нет
+* Альтернативная гипотза - Данные распределены неравномерно, т.е. есть вероятность получить хорошую кластеризацию 
+
+Существует некоторая [путанница](https://stats.stackexchange.com/questions/332651/validating-cluster-tendency-using-hopkins-statistic) с интерпретацией статистики Хопкинса. Проблема в том, что в пакете factoextra она считается как H, а в другом популярном пакете clustertrends как 1-H. 
+
+Мы воспользуемся первым решением. Согласно ему, конвенционально, если H>0.7, то мы можем принимать альтернативную гипотезу. Чем ближе H к 1, тем более выраженные в данных кластеры.
+
+```{r}
+get_clust_tendency(hs_scaled, 
+                   n = nrow(hs_scaled)-1)[1]
+```
+
+Сравним со случайным датасетом той же размерности: 
+
+```{r}
+# Сгенерируем его
+random_df <- apply(hs_scaled, 2,
+                   function(x){runif(length(x), min(x), (max(x)))})
+
+# Hopkins
+hopkins(random_df, 
+        n = nrow(random_df)-1)[1]
+```
+
+
+### Визуальная оценка 
+
+Рассчитаем матрицу различий (dissimilarity matrix) в данных, а затем упорядочим её. При наличии кластеров в данных мы должны визуально увидеть определённый порядок. Пример:
+
+```{r}
+fviz_dist(hs_dist, show_labels = FALSE)+
+  labs(title = "Health Systems")
+```
+
+Сравним со случайными данными:
+
+```{r}
+fviz_dist(dist(random_df), show_labels = FALSE)+
+  labs(title = "Random data")
+```
+
+
+
+## Методы оценки качества кластеризации
+
+
+### Silhouette plot
+
+Визуализация графика по мере силуэта. График силуэта отображает меру того, насколько близка каждая точка в одном кластере к точкам в соседних кластерах. Чем ближе значение к 1, тем лучше наблюдение относится к своему кластеру и подобно наблюдениям в нём. Если значение ближе к -1, наблюдение не похоже на объекты в своём кластере (скорее всего оно должно относится к другому кластеру).
+
+```{r}
+sil <- silhouette(hs_kmean$cluster,
+                  hs_dist)
+fviz_silhouette(sil, palette = "jco",
+                ggtheme = theme_classic())
+```
+
+
+### Dunn index (Индекс Данна) 
+
+Минимальное расстояние между кластерами делим на максимальное расстояние внутри кластеров. Чем больше значение, тем лучше качество кластеризации:
+
+```{r}
+hs_stats <- fpc::cluster.stats(hs_dist, 
+                               hs_kmean$cluster)
+# Dunn index
+hs_stats$dunn
+```
+
+Обратите внимание на остальные метрики ():
+
+```{r}
+hs_stats
+```
+
+
+# Полезные ссылки
+
+
+* Soetewey A. (2017) [The complete guide to clustering analysis: k-means and hierarchical clustering by hand and in R](https://statsandr.com/blog/clustering-analysis-k-means-and-hierarchical-clustering-by-hand-and-in-r/)
+* Pang-Ning T. et al (2017) [Clustering Analysis](https://mhahsler.github.io/Introduction_to_Data_Mining_R_Examples/book/clustering-analysis.html) In. An R Companion for Introduction to Data Mining. 
+* Alboukadel K. (2018) [Assessing Clustering Tendency](https://www.datanovia.com/en/lessons/assessing-clustering-tendency/)
