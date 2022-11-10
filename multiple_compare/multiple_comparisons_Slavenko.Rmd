@@ -1,0 +1,929 @@
+---
+title: "Multiple Comparisons"
+author: "Matvei Slavenko / Матвей Славенко"
+date: "02.07.2022"
+output:
+  slidy_presentation:
+    duration: 90
+  ioslides_presentation: default
+  footer: "Проблема множественных сравнений"
+subtitle: Проблема множественных сравнений
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(kableExtra)
+
+#source("scratches.R")
+```
+
+```{r plot-functions, include = FALSE}
+plot.playground <-
+  function(x, y, true.x = NULL, true.y = NULL, xlab = "Height (cm)", ylab = "Age (y)", square = FALSE) {
+    # Prepare the canvas
+    plot(
+      x = c(
+        min(x, na.rm = TRUE) - 5,
+        max(x, na.rm = TRUE)
+      ),
+      y = c(
+        min(y, na.rm = TRUE) - 2.5,
+        max(y, na.rm = TRUE)
+      ),
+      type = "n",
+      frame.plot = FALSE,
+      xlab = xlab,
+      ylab = ylab
+    )
+    
+    x.jitter <- runif(length(y), -4.9, -1.5)
+    
+    # Plot Y rug 
+    points(
+      rep(min(x, na.rm = TRUE), length(y)) + x.jitter,
+      y,
+      pch = 20,
+      cex = 0.5,
+      col = "darkgoldenrod2"
+    )
+    
+    
+    y.jitter <- runif(length(x), -2.4, -0.5)
+    
+    # Plot X rug
+    points(
+      x,
+      rep(min(y, na.rm = TRUE), length(x)) + y.jitter,
+      pch = 20,
+      cex = 0.5,
+      col = "salmon3"
+    )
+    
+    if(square){
+      plot.square(x, y, true.x, true.y)
+    }
+    
+  }
+
+
+
+plot.square <- function(x, y, true.x = NULL, true.y = NULL, alpha = 0.05){
+  
+  x.confint <- t.test(x, conf.level = 1 - alpha)$conf.int[c(1, 2)]
+  y.confint <- t.test(y, conf.level = 1 - alpha)$conf.int[c(1, 2)]
+  
+  abline(h = true.y, col = "deepskyblue3", lty = 5)
+  abline(v = true.x, col = "deepskyblue3", lty = 5)
+  
+  points(true.x, true.y, col = "deepskyblue3", pch = 18, cex = 2)
+  
+  if(is.null(true.x)){
+    col.x <- "black"
+  } else if(x.confint[1] <= true.x & true.x <= x.confint[2]){
+    col.x <- "darkolivegreen3"
+  } else {
+    col.x <- "brown2"
+  }
+  
+  if(is.null(true.y)){
+    col.y <- "black"
+  } else if(y.confint[1] <= true.y & true.y <= y.confint[2]){
+    col.y <- "darkolivegreen3"
+  } else {
+    col.y <- "brown2"
+  }
+  
+  lines(x = x.confint, y = rep(y.confint[1], 2), col = col.x, lwd = 2)
+  lines(x = x.confint, y = rep(y.confint[2], 2), col = col.x, lwd = 2)
+  
+  
+  lines(y = y.confint, x = rep(x.confint[1], 2), col = col.y, lwd = 2)
+  lines(y = y.confint, x = rep(x.confint[2], 2), col = col.y, lwd = 2)
+}
+```
+
+
+# Часть 1. Разминка
+
+## Данные. Генеральная совокупность
+
+Файл `soccer.csv`. 
+
+Данные о футболистах: имя, позиция на поле (защитник, форвард, голкипер или полузащитник), гражданство, возраст и рост.
+
+```{r}
+soccer_general <- read.csv("soccer.csv", sep=";")[, 2:6] %>%
+  mutate(Position = as.factor(Position),
+         Nationality = as.factor(Nationality),
+         Age = as.numeric(Age),
+         Height = as.numeric(Height)) %>%
+  filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian"))
+
+```
+
+## Данные. Наша рабочая выборка
+
+```{r}
+set.seed(1)
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 50), ] %>%
+  mutate(Nationality = factor(Nationality))
+
+
+soccer_wrk %>% head
+```
+
+_Не совсем корректно, конечными генеральными совокупностями занимается не классическая статистика, а sample surveys. Но для сегодняшних целей пойдет._
+
+## Данные -- сводка
+
+```{r}
+soccer_wrk %>% summary
+```
+
+## Сфокусируемся на возрасте защитников (Defenders)
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% pull(Age) %>% summary
+```
+
+## Разминка 1. Тестирование
+
+Средний возраст защитника в генеральной совокупности: 
+```{r}
+soccer_general %>% filter(Position == "Defender") %>% pull(Age) %>% mean(na.rm = TRUE)
+```
+
+Как протестировать гипотезу $H0: \mu = 26.88$?
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% select(Age) %>% t.test(mu = 26.88)
+```
+
+## Разминка 2. Типы ошибок
+
+Какие два типа ошибок мы можем допустить при тестировании гипотез?
+
+## Разминка 2. Типы ошибок
+
+Какие два типа ошибок мы можем допустить при тестировании гипотез?
+
+```{r echo=FALSE}
+data.frame(c("H0 rejected", "H0 not rejected")
+           , c("Type I error", "OK"), 
+           c("OK", "Type II error")) %>%
+  kbl(booktabs = T,
+      digits = 2,
+      col.names = c("", "H0 holds", "H0 does not hold")) %>%
+  kable_styling(
+    latex_options = "hold_position",
+    bootstrap_options = c("hover"),
+    full_width = F
+  ) %>%
+  column_spec(1, bold = T)
+```
+
+## Разминка 2. Типы ошибок
+
+```{r echo = FALSE} 
+data.frame(c("H0 rejected", "H0 not rejected"), c("Type I error", "OK"), c("OK", "Type II error")) %>%
+  kbl(booktabs = T,
+      digits = 2,
+      col.names = c("", "H0 holds", "H0 does not hold")) %>%
+  kable_styling(
+    latex_options = "hold_position",
+    bootstrap_options = c("hover"),
+    full_width = F
+  ) %>%
+  column_spec(1, bold = T)
+```
+
+1. Можем ли мы контролировать ошибку первого типа?
+2. А ошибку второго типа?
+
+## Разминка 2. Типы ошибок
+
+```{r echo = FALSE} 
+data.frame(c("H0 rejected", "H0 not rejected"), 
+           c("Type I error", "OK"), 
+           c("OK", "Type II error")) %>%
+  kbl(booktabs = T,
+      digits = 2,
+      col.names = c("", "H0 holds", "H0 does not hold")) %>%
+  kable_styling(
+    latex_options = "hold_position",
+    bootstrap_options = c("hover"),
+    full_width = F
+  ) %>%
+  column_spec(1, bold = T)
+```
+
+
+
+
+- Можем ли мы контролировать ошибку первого типа?
+  - => да, выбираем $\alpha$ => Comparison-wise Error Rate
+- А ошибку второго типа? 
+  - => косвенно, через увеличение размера выборки 
+  - => power analysis
+
+## Разминка 3. Доверительные интервалы
+
+p-value -- это здорово, но нам бы хотелось иметь более детальное представление о среднем возрасте защитников.
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% pull(Age) %>% t.test(mu = 26.88)
+```
+
+* Что такое 95% доверительный интервал?
+
+
+## Разминка 3. Доверительные интервалы
+
+p-value -- это здорово, но нам бы хотелось иметь более детальное представление о среднем возрасте защитников.
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% pull(Age) %>% t.test
+```
+
+
+
+* Что такое 95% доверительный интервал?
+  * Это процедура
+  * Процедура на основе данных (= выборки) генерирует интервал
+  * При многократном повторении эксперимента, сгененерированный интервал в 95% процентов случаев покроет среднее генеральной совокупности.
+
+
+## Разминка 3. Доверительные интервалы
+
+p-value -- это здорово, но нам бы хотелось иметь более детальное представление о среднем возрасте защитников.
+
+* Что такое 95% доверительный интервал?
+  * Это процедура
+  * Процедура на основе данных (= выборки) генерирует интервал
+  * При многократном повторении эксперимента, сгененерированный интервал в 95% процентов случаев покроет среднее генеральной популяции.
+* Бывают ли интервалы не для среднего?
+
+## Разминка 3. Доверительные интервалы
+
+p-value -- это здорово, но нам бы хотелось иметь более детальное представление о среднем возрасте защитников.
+
+* Что такое 95% доверительный интервал?
+  * Это процедура
+  * Процедура на основе данных (= выборки) генерирует интервал
+  * При многократном повторении эксперимента, сгененерированный интервал в 95% процентов случаев покроет среднее генеральной популяции.
+* Бывают ли интервалы не для среднего?
+  * Потенциально для любого другого параметра: дисперсия, медиана, risk ratio и тд.
+
+## Разминка 3. Доверительные интервалы
+
+* Какова вероятность "осечки" для 95% интервала? 
+* Бывают ли не 95% интервалы?
+
+## Разминка 3. Доверительные интервалы
+
+* Какова вероятность "осечки" для 95% интервала?
+  * 95% вероятность покрытия -- 5% ошибка => Comparison-Wise Error Rate (CWER).
+* Бывают ли не 95% интервалы?
+  * Конечно, опять выбираем $\alpha$, вероятность покрытия тогда будет $1-\alpha$.
+
+
+## Разминка 3. Доверительные интервалы
+
+* Какова вероятность "осечки" для 95% интервала?
+  * 95% вероятность покрытия -- 5% ошибка => Comparison-Wise Error Rate (CWER).
+* Бывают ли не 95% интервалы?
+  * Конечно, опять выбираем $\alpha$, вероятность покрытия тогда будет $1-\alpha$.
+* "Осечка" для 95% интервала -- это ошибка первого или второго рода?
+
+## Разминка 3. Доверительные интервалы
+
+* Какова вероятность "осечки" для 95% интервала?
+  * 95% вероятность покрытия -- 5% ошибка => Comparison-Wise Error Rate (CWER).
+* Бывают ли не 95% интервалы?
+  * Конечно, опять выбираем $\alpha$, вероятность покрытия тогда будет $1-\alpha$.
+* "Осечка" для 95% интервала -- это ошибка первого или второго рода?
+  * "Ошибка первого рода" -- мы можем ее контролировать.
+* А что тогда соответствует "ошибке второго рода"?
+
+## Разминка 3. Доверительные интервалы
+
+* Какова вероятность "осечки" для 95% интервала?
+  * 95% вероятность покрытия -- 5% ошибка => Comparison-Wise Error Rate (CWER).
+* Бывают ли не 95% интервалы?
+  * Конечно, опять выбираем $\alpha$, вероятность покрытия тогда будет $1-\alpha$.
+* "Осечка" для 95% интервала -- это ошибка первого или второго рода?
+  * "Ошибка первого рода" -- мы можем ее контролировать.
+* А что тогда соответствует "ошибке второго рода"?
+  * В каком-то смысле длина интервала -- контролируем только косвенно.
+
+## Подведем итоги
+
+```{r echo = FALSE} 
+rbind(      c("Type I Error", "CI \"missed\" the true value", "Directly via choosing alpha"),
+            c("Type II Error", "Interval width", "Increasing alpha OR increasing N")) %>%
+  kbl(booktabs = T,
+      digits = 2,
+      col.names = c("Test", "CI", "How to control")) %>%
+  kable_styling(
+    latex_options = "hold_position",
+    bootstrap_options = c("hover"),
+    full_width = F
+  ) %>%
+  column_spec(1, bold = T)
+```
+
+## Еще раз возраст
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% pull(Age) %>% t.test %>% with(conf.int)
+```
+
+
+## А что там с ростом?
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% pull(Height) %>% t.test
+```
+
+## А что там с ростом?
+
+Средний рост защитника в генеральной совокупности:
+```{r}
+soccer_general %>% filter(Position == "Defender") %>% pull(Height) %>% mean(na.rm = TRUE)
+```
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% pull(Height) %>% t.test(mu = 183.586)
+```
+
+## Итак, два интервала
+
+```{r, fig.height=6, fig.width=6, out.extra = 'style="float:left; padding:10px"'}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+                soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+                square = TRUE)
+```
+
+С какой вероятностью доверительный квадр покроет точку (реальный средний рост, реальный средний возраст)?
+
+## Итак, два интервала
+
+```{r, fig.height=6, fig.width=6, out.extra = 'style="float:left; padding:10px"'}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+                soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+                square = TRUE)
+```
+
+С какой вероятностью доверительный квадр покроет точку (реальный средний рост; реальный средний возраст)?
+
+$0.95 \cdot 0.95 = 0.9025 < 0.95$ -- в случае независимых интервалов; в общем случае -- сложно сказать.
+
+## Итак, два интервала
+
+```{r, fig.height=6, fig.width=6, out.extra = 'style="float:left; padding:10px"'}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+```
+
+С какой вероятностью доверительный квадр покроет точку (реальный средний рост; реальный средний возраст)?
+
+$0.95 \cdot 0.95 = 0.9025 < 0.95$ -- в случае независимых интервалов; в общем случае -- сложно сказать.
+
+## А что если интервалов больше? Family-Wise Error Rate
+
+Вероятность покрытия квадром (n интервалов, каждый должен "попасть"): $(1-\alpha)^n$.
+
+Вероятность "осечки" квадра (хотя бы один интервал "промахнулся") aka FWER: $1 - (1-\alpha)^n$
+
+```{r out.width = "50%", echo = FALSE, fig.align= 'center'}
+x <- 1:100
+y <- 1-(1-0.05)^x
+
+plot(x, y, type = "l", pch = 21,
+     main = "FWER depending on number of intervals",
+     sub = "Comparison-Wise Error Rate = 0.05",
+     xlab = "Number of tests",
+     ylab = "Family-Wise Error Rate",
+     frame.plot = FALSE,
+     col = "salmon3",
+     lwd = 2)
+
+lines(x = c(0, 45), y = c(0.9, 0.9), col = "cadetblue3", lwd = 2)
+lines(x = c(45, 45), y = c(0, 0.9), col = "cadetblue3", lwd = 2)
+
+lines(x = c(0, 14), y = c(0.5, 0.5), col = "cadetblue3", lwd = 2)
+lines(x = c(14, 14), y = c(0, 0.5), col = "cadetblue3", lwd = 2)
+
+```
+
+# Часть 2. "Слепила из того, что было". Два подхода к решению проблемы.
+
+## FWER -- как из многих доверительных интервалов "слепить" доверительную область.
+
+```{r, fig.height=6, fig.width=6, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+```
+
+Мы имеем семейство из двух интервалов -- два сравнения -- и мы хотим контролировать "общую" ошибку первого рода.
+
+* Ошибка первого рода -- "доверительный квадр" "промахнулся" => FWER.
+* Квадр "промахивается" тогда, когда хотя бы один из интервалов "промахивается".
+
+Как добиться: поправить CWER (т.е.\ $\alpha$) так, чтобы FWER = 0.05
+
+## FWER -- как из многих доверительных интервалов "слепить" доверительную область.
+
+```{r, fig.height=6, fig.width=6, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+```
+
+Как добиться: поправить CWER (т.е.\ $\alpha$) так, чтобы FWER = 0.05
+
+Мы "поправляем" $\alpha$ -- отсюда название для таких процедур -- поправки на множественные сравнения (multiple comparison correction).
+
+Результат поправки: $\alpha_{adj}$, adjusted $\alpha$, поправленное альфа.
+
+Интервалы, построенные с вероятностью покрытия $1 - \alpha_{adj}$: simultaneous CI.
+
+## FWER. Поправка Бонферрони.
+
+Пусть мы хотим построить $n$ интервалов с $FWER = \alpha$.
+
+Бонферрони предлагает: $CWER = \alpha_{adj} := \alpha/n$. Такая процедура гарантирует, что $FWER <= 0.05$.
+
+__В нашем случае:__
+
+*  Хотим квадр для роста и возраста защитников с вероятностью "осечки" $\alpha = 0.05 = FWER$.
+  * Вероятность покрытия для квадра тогда...
+  
+## FWER. Поправка Бонферрони. Пример.
+
+Пусть мы хотим построить $n$ интервалов с $FWER = \alpha$.
+
+Бонферрони предлагает: $CWER = \alpha_{adj} := \alpha/n$. Такая процедура гарантирует, что $FWER <= 0.05$.
+
+__В нашем случае:__
+
+* Хотим квадр для роста и возраста защитников с вероятностью "осечки" $\alpha = 0.05 = FWER$.
+  * Вероятность покрытия для квадра тогда $1- \alpha = 1-FWER = 0.95$. 95% квадр.
+* Чему должен быть равен CWER по Бонферрони?
+
+## FWER. Поправка Бонферрони. Пример.
+
+Пусть мы хотим построить $n$ интервалов с $FWER = \alpha$.
+
+Бонферрони предлагает: $CWER = \alpha_{adj} := \alpha/n$. Такая процедура гарантирует, что $FWER <= 0.05$.
+
+__В нашем случае:__
+
+* Хотим квадр для роста и возраста защитников с вероятностью "осечки" $\alpha = 0.05 = FWER$.
+  * Вероятность покрытия для квадра тогда $1- \alpha = 1-FWER = 0.95$. 95% квадр.
+* Чему должен быть равен CWER по Бонферрони?
+  * $\alpha_{adj} = 0.05/2 = 0.025$
+  * Отдельные интервалы имеют вероятность покрытия $1-0.025=0.975$.
+  
+## FWER. Поправка Бонферрони. Пример.
+
+```{r, fig.height=6, fig.width=6, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+```
+
+__В нашем случае:__
+
+* Хотим квадр для роста и возраста защитников с вероятностью "осечки" $\alpha = 0.05 = FWER$.
+  * Вероятность покрытия для квадра тогда $1- \alpha = 1-FWER = 0.95$. 95% квадр.
+* Чему должен быть равен CWER по Бонферрони?
+  * $\alpha_{adj} = 0.05/2 = 0.025$
+  * Отдельные интервалы имеют вероятность покрытия $1-0.025=0.975$.
+
+## FWER. Поправка Бонферрони. Пример.
+
+```{r, fig.height=6, fig.width=6, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+plot.square(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  alpha = 0.05/2
+)
+```
+
+__В нашем случае:__
+
+* Хотим квадр для роста и возраста защитников с вероятностью "осечки" $\alpha = 0.05 = FWER$.
+  * Вероятность покрытия для квадра тогда $1- \alpha = 1-FWER = 0.95$. 95% квадр.
+* Чему должен быть равен CWER по Бонферрони?
+  * $\alpha_{adj} = 0.05/2 = 0.025$
+  * Отдельные интервалы имеют вероятность покрытия $1-0.025=0.975$.
+
+## FWER. Поправка Бонферрони на языке p-values.
+
+Поправку Бонферрони мы можем использовать и в контексте тестирования. Поправлять будем p-values, в результате получим _adjusted p-values_, $p_{adj}$.
+
+$p^{adj}_i := n \cdot p_i$
+
+## FWER. Поправка Бонферрони на языке p-values. Пример.
+
+Средний возраст защитника в генеральной совокупности: 
+```{r}
+soccer_general %>% filter(Position == "Defender") %>% pull(Age) %>% mean(na.rm = TRUE)
+```
+
+Средний рост защитника в генеральной совокупности: 
+```{r}
+soccer_general %>% filter(Position == "Defender") %>% pull(Height) %>% mean(na.rm = TRUE)
+```
+
+## FWER. Поправка Бонферрони на языке p-values. Пример.
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% select(Age) %>% t.test(mu = 26.88)
+```
+
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% select(Height) %>% t.test(mu = 183.57)
+```
+## FWER. Поправка Бонферрони на языке p-values. Пример.
+
+Поправлять будем p-values, в результате получим _adjusted p-values_, $p_{adj}$.
+
+$p^{adj}_i := n \cdot p_i$
+
+* Возраст: $p_1 = 0.5188$
+* Рост: $p_2 = 0.03727$
+
+## FWER. Поправка Бонферрони на языке p-values. Пример.
+
+Поправлять будем p-values, в результате получим _adjusted p-values_, $p_{adj}$.
+
+$p^{adj}_i := n \cdot p_i$
+
+* Возраст: $p_1 = 0.5188$, $p_1^{adj} = 1$
+* Рост: $p_2 = 0.03727$, $p_2^{adj} = 0.07454$
+
+## FWER. Поправка Бонферрони на языке p-values. Пример.
+
+Поправлять будем p-values, в результате получим _adjusted p-values_, $p_{adj}$.
+
+$p^{adj}_i := n \cdot p_i$
+
+* Возраст: $p_1 = 0.5188$, $p_1^{adj} = 1$
+* Рост: $p_2 = 0.03727$, $p_2^{adj} = 0.07454$
+
+```{r}
+p.adjust(c(0.5188, 0.03727), method = "bonferroni")
+```
+
+
+## No Free Sandwich: чем расплачиваемся?
+
+
+```{r, fig.height=7, fig.width=7, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+```
+
+* Любая поправка снижает CWER. Какой у этого побочный эффект?
+
+
+## No Free Sandwich: чем расплачиваемся?
+
+```{r, fig.height=7, fig.width=7, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+plot.square(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  alpha = 0.05/2
+)
+```
+
+* Любая поправка снижает CWER. Какой у этого побочный эффект?
+    * Увеличение вероятности ошибки второго рода aka удлинение интервалов по отдельности.
+
+## No Free Sandwich: чем расплачиваемся?
+
+```{r, fig.height=7, fig.width=7, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+plot.square(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  alpha = 0.05/10
+)
+```
+
+* Любая поправка снижает CWER. Какой у этого побочный эффект?
+    * Увеличение вероятности ошибки второго рода aka удлинение интервалов по отдельности.
+    * Конкретно Бонферрони очень консервативен. Т.е. для большого количества тестов $FWER << 0.05$, вероятность ошибки второго рода (длины интервалов) очень большие.
+    
+_-- Не подскажете, где вход в метро?_
+
+_-- Где-то в Евразии._
+
+## No Free Sandwich: чем расплачиваемся?
+
+```{r, fig.height=7, fig.width=7, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+plot.square(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  alpha = 0.05/100
+)
+```
+
+* Любая поправка снижает CWER. Какой у этого побочный эффект?
+    * Увеличение вероятности ошибки второго рода aka удлинение интервалов по отдельности.
+    * Конкретно Бонферрони очень консервативен. Т.е. для большого количества тестов $FWER << 0.05$, вероятность ошибки второго рода (длины интервалов) очень большие.
+    
+_-- Не подскажете, где вход в метро?_
+
+_-- Где-то в Евразии._
+
+## No Free Sandwich: чем расплачиваемся?
+
+```{r, fig.height=7, fig.width=7, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+plot.square(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  alpha = 0.05/100
+)
+```
+
+* Любая поправка снижает CWER. Какой у этого побочный эффект?
+    * Увеличение вероятности ошибки второго рода aka удлинение интервалов по отдельности.
+    * Конкретно Бонферрони очень консервативен. Т.е. для большого количества тестов $FWER << 0.05$, вероятности ошибки второго рода (длины интервалов) очень большие.
+    
+_-- Не подскажете, где вход в метро?_
+
+_-- Где-то в Евразии._
+
+Заметим: $p_{adj} = min(1, n\cdot p) \rightarrow 1$ при $n \rightarrow \infty$, т.е. нулевая гипотеза (почти) никогда не будет отвергнута.
+
+Также заметим: $1- \frac{\alpha}{n} \rightarrow 1$ при $n \rightarrow 1$, т.е. отдельный интервал почти всегда покроет реальное значение -- ценой большой длины.
+
+## No Free Sandwich: чем расплачиваемся?
+
+```{r, fig.height=7, fig.width=7, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+plot.square(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  alpha = 0.05/1000
+)
+```
+
+* Любая поправка снижает CWER. Какой у этого побочный эффект?
+    * Увеличение вероятности ошибки второго рода aka удлинение интервалов по отдельности.
+    * Конкретно Бонферрони очень консервативен. Т.е. для большого количества тестов $FWER << 0.05$, вероятности ошибки второго рода (длины интервалов) очень большие.
+    
+_-- Не подскажете, где вход в метро?_
+
+_-- Где-то в Евразии._
+
+Заметим: $p_{adj} = min(1, n\cdot p) \rightarrow 1$ при $n \rightarrow \infty$, т.е. нулевая гипотеза (почти) никогда не будет отвергнута.
+
+Также заметим: $1- \frac{\alpha}{n} \rightarrow 1$ при $n \rightarrow 1$, т.е. отдельный интервал почти всегда покроет реальное значение -- ценой большой длины.
+
+## No Free Sandwich: чем расплачиваемся?
+
+```{r, fig.height=7, fig.width=7, out.extra = 'style="float:left; padding:10px"', echo = FALSE}
+plot.playground(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  square = TRUE
+)
+plot.square(soccer_wrk %>% filter(Position == "Defender") %>% pull(Height),
+  soccer_wrk %>% filter(Position == "Defender") %>% pull(Age),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Height) %>% mean(na.rm = TRUE),
+  soccer_general %>% filter(Position == "Defender") %>% 
+    pull(Age) %>% mean(na.rm = TRUE),
+  alpha = 0.05/3000
+)
+```
+
+* Любая поправка снижает CWER. Какой у этого побочный эффект?
+    * Увеличение вероятности ошибки второго рода aka удлинение интервалов по отдельности.
+    * Конкретно Бонферрони очень консервативен. Т.е. для большого количества тестов $FWER << 0.05$, вероятности ошибки второго рода (длины интервалов) очень большие.
+* Существуют альтернативные поправки: Шидак, Симс, Шеффе, Хохберг (не путать с Бенджамини-Хохбергом!) и т.д.
+  * Не очень популярны, на практике для контроля FWER все обычно используют Бонферрони (или Холма).
+  * Обращайте внимание на условия применимости. Бонферрони бронебоен и универсален, другие поправки могут иметь дополнительные условия (например, Шидак требует независимости тестовых статистик).
+  * Бонферрони можно использовать для "склеивания" каких угодно тестов. Некоторые процедуры узкоспециальны (например, ANOVA и post-hoc процедуры к ней).
+  * Поправки часто конструировались для тестов. Некоторые из поправок непросто или невозможно перевести на язык доверительных интервалов.
+
+## (Почти) бесплатный тюнинг Бонферрони. Поправка Холма.
+
+В случае, если мы хотим контролировать FWER, но фокусируемся на p-values, а доверительные области/интервалы нас не особо интересуют, мы можем использовать поправку Холма.
+
+* Поправка Холма (как и Бонферрони) контролирует FWER.
+* Поправка Холма однако часто более мягкая, чем поправка Бонферрони. Соответственно, тесты имеют большую силу. 
+* Поправка Холма универсальна, как и Бонферрони: никаких дополнительных требований, можно "склеивать" любые тесты.
+* Минус -- перевод поправки на язык доверительных интервалов неочевиден.
+* Минус -- склеивает конкретные тесты вместе, нельзя разделить и пересобрать (обсудим чуть позже).
+
+```{r}
+p.adjust(c(0.5188, 0.03727), method = "bonferroni")
+```
+
+```{r}
+p.adjust(c(0.5188, 0.03727), method = "holm")
+```
+
+## А что если тестов очень много? FDR
+
+Мы можем подойти к обобщению ошибки первого рода с другого конца.
+
+Предположим мы провели 1000 тестов, 100 из которых показали $p<0.05$ -- т.е. мы совершили 100 "открытий" (discoveries). Сколько из этих открытий ложные, т.е. сколько ошибок первого рода мы совершили? 
+
+Интуитивно мы ожидаем, что процент ложных открытий должен быть в среднем около 5%. 
+
+## А что если тестов очень много? FDR
+
+Мы можем подойти к обобщению ошибки первого рода с другого конца. 
+
+Предположим мы провели 1000 тестов, 100 из которых показали $p<0.05$ -- т.е. мы совершили 100 "открытий" (discoveries). Сколько из этих открытий ложные, т.е. сколько ошибок первого рода мы совершили? 
+
+Интуитивно мы ожидаем, что процент ложных открытий должен быть в среднем около 5%. 
+
+_Ожидаемая_ доля _ложных_ открытий от _всех_ открытий называется False Discovery Rate (FDR). Мы можем контролировать FDR вместо FWER -- обычно это приводит к более мягким поправкам и, соответственно, более сильным тестам. Зачастую более разумно контролировать FDR вместо FWER: особенно это касается геномики, протеомики и прочих -ик.
+
+## А что если тестов очень много? FDR
+
+Мы можем подойти к обобщению ошибки первого рода с другого конца. 
+
+Предположим мы провели 1000 тестов, 100 из которых показали $p<0.05$ -- т.е. мы совершили 100 "открытий" (discoveries). Сколько из этих открытий ложные, т.е. сколько ошибок первого рода мы совершили? 
+
+Интуитивно мы ожидаем, что процент ложных открытий должен быть в среднем около 5%. 
+
+_Ожидаемая_ доля _ложных_ открытий от _всех_ открытий называется False Discovery Rate (FDR). Мы можем контролировать FDR вместо FWER -- обычно это приводит к более мягким поправкам и, соответственно, более сильным тестам. Зачастую более разумно контролировать FDR вместо FWER: особенно это касается геномики, протеомики и прочих -ик.
+
+Самая популярная поправка, которая контролирует FDR -- поправка / процедура Бенджамини-Хохберга. __Процедура предполагает независимость проводимых тестов!__
+
+## А что если тестов очень много? FDR
+
+Мы можем подойти к обобщению ошибки первого рода с другого конца. 
+
+Предположим мы провели 1000 тестов, 100 из которых показали $p<0.05$ -- т.е. мы совершили 100 "открытий" (discoveries). Сколько из этих открытий ложные, т.е. сколько ошибок первого рода мы совершили? 
+
+Интуитивно мы ожидаем, что процент ложных открытий должен быть в среднем около 5%. 
+
+_Ожидаемая_ доля _ложных_ открытий от _всех_ открытий называется False Discovery Rate (FDR). Мы можем контролировать FDR вместо FWER -- обычно это приводит к более мягким поправкам и, соответственно, более сильным тестам. Зачастую более разумно контролировать FDR вместо FWER: особенно это касается геномики, протеомики и прочих -ик.
+
+Самая популярная поправка, которая контролирует FDR -- поправка / процедура Бенджамини-Хохберга. __Процедура предполагает независимость тестируемых гипотез!__
+
+```{r}
+p.adjust(c(0.5188, 0.03727), method = "BH")
+```
+
+## Применение поправок. Практические рекомендации.
+
+* Проводить только те тесты, которые действительно нужны/важны и применять поправки к ним.
+  * Альтернатива: разумная группировка тестов в "семейства" и применять поправки внутри семейств. Например, сгруппировать тесты по группам пациентов.
+  * Если мы исследуем три опросника на трех группах пациентов, можно сделать поправку Бонферрони на три теста, а не на девять. Тогда любые комбинации из трех тестов будут "проконтролированы". В частности, можно рассматривать три опросника внутри одной группы пациентов или три группы пациентов в рамках одного опросника. (Не работает с Холмом).
+
+## Применение поправок. Практические рекомендации.
+
+Общая логика применения поправок: важно решить, ошибка первого или второго рода более нежелательна и на основании этого выбирать поправку.
+
+* В эксплораторных исследованиях можно применять более мягкие поправки или не применять поправки вообще.
+  * Обычно после этого следует конфирматорное исследование, где поправки уже применяются.
+  * Сюда же можно отнести геномику и прочие области с 1000+ тестов на одном датасете.
+* Обычно поправки не применяются в safety studies -- исследование побочных или негативных эффектов.
+
+## Применение поправок. Практические рекомендации.
+
+* FWER как правило обеспечивает более строгий контроль над ошибками первого рода. Его разумно применять в конфирматорных исследованиях.
+  * FWER разумно применять, когда нужно проконтролировать все тесты / параметры __вместе__. Пример: бета-блокаторы должны _одновременно_ снижать давление и ЧСС.
+* FDR дает более мягкий контроль над ошибками первого рода и более низкую вероятность ошибки второго рода. Его разумно использовать при поиске "зацепок" для дальнейших исследований (эксплораторные исследования).
+* Иногда пачку тестов с поправками можно заменить одним более сильным тестом (change-point models, Hotelling T-test, AN(C)OVA...). Помните, обычно существует более одного способа подойти к задаче.
+
+## Рекомендованная литература
+
+1. _Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing_ by Yoav Benjamini and Yoav Hochberg.
+
+## Домашнее задание
+
+```{r}
+soccer_general <- read.csv("soccer.csv", sep=";")[, 2:6] %>%
+  mutate(Position = as.factor(Position),
+         Nationality = as.factor(Nationality),
+         Age = as.numeric(Age),
+         Height = as.numeric(Height)) %>%
+  filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian"))
+
+set.seed(1)
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 150), ] %>%
+  mutate(Nationality = factor(Nationality))
+
+```
+
+Есть ли разница между средним ростом футболистов, играющих на разных позициях?
+
+1. Постройте доверительные интервалы для попарных разниц между средними (без поправок и с поправкой Бонферрони). Покрывают ли интервалы реальную разницу между средним ростом? Иллюстрации приветствуются.
+2. Проведите попарные тесты для разниц между средними (без поправок, с поправкой Холма и поправкой Бенджамини-Хохберга). Сколько открытий получилось в каждом случае? Сколько из них ложные?
+
+Hint: вам может пригодиться функция `paired.t.test`.
+
+Hint 2: параметр задайте параметр `pool.sd = FALSE`.
+
+
+Решение в формате html отчета + исходный код.

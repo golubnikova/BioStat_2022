@@ -8,7 +8,11 @@ stat_criterions_H0 <- sapply(1:num_samples, function(k){
   stat_criterion <- sqrt(sample_size)*abs(mean(Hg_change))/sd(Hg_change)
 })
 
+<<<<<<< HEAD
 threshold <- 2
+=======
+threshold <- 1.96
+>>>>>>> 56bba9b... new classes
 
 hist(stat_criterions_H0,freq = FALSE)
 

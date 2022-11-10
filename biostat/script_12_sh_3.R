@@ -17,9 +17,16 @@ stat_criterions <- sapply(1:num_samples, function(k){
 
 hist(stat_criterions,freq = FALSE)
 
+<<<<<<< HEAD
 threshold <- 1.96 # ??? Хочу ошибку первого рода 0.05
 
 Type_I_error <- sum(stat_criterions > threshold)/num_samples  
+=======
+threshold <- 1.98 # ??? Хочу ошибку первого рода 0.05 -- метод подбора
+threshold <- qt(0.975, sample_size-1) # ??? Хочу ошибку первого рода 0.05 -- аналитический расчет
+
+Type_I_error <- sum(stat_criterions > threshold)/num_samples #Оценка вероятности ошибки I рода  
+>>>>>>> 56bba9b... new classes
   
 print(Type_I_error)
 
