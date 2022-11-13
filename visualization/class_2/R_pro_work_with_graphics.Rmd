@@ -277,6 +277,7 @@ ggplotly(plot)
 В чанке ниже напишите код любого графика и сделайте его интерактивным:
 
 ```{r}
+insurance_cost <- read.csv('../hw1/data/insurance_cost.csv', stringsAsFactors = T)
 plot1 <- insurance_cost %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(
@@ -293,6 +294,7 @@ plot1 <- insurance_cost %>%
  theme_minimal() +
  ggtitle('Scatter plot отношения переменных возраста и зарплаты') +
  theme(axis.text.x = element_text(size = 14))
+
 ggplotly(plot1)
 ```
 
@@ -666,7 +668,7 @@ pima_example_pc1 <- pima_example %>%
 
 # Сделаем тоже самое с pc2
 pima_example_pc2 <- pima_example %>%
-  group_by(pc2_quantile) %>%
+  group_by(pc2_decile) %>%
   summarise(mass_pc2 = mean(mass),
             triceps_pc2 = mean(triceps))
 ```
@@ -774,7 +776,7 @@ $ PC2 = (0.707 * mass) + (0.707 * triceps) $
 
 ```{r}
 ggplot() +
-  geom_point(data = pima.pca$x, # Новые переменные лежат здесь
+  geom_point(data = as.data.frame(pima.pca$x), # Новые переменные лежат здесь
              aes(x = PC1, y = PC2)) +
   theme_minimal() 
 ```
@@ -824,6 +826,8 @@ plot_ly(data = pima_clear,
 
 ```{r}
 # Загрузим библиотеки
+#install.packages('devtools')
+library(devtools)
 library(FactoMineR)
 library(ggbiplot)
 ```
@@ -844,7 +848,7 @@ summary(pima_full.pca)
 Смотрим на "Cumulative Proportion". У нас в данных первые 4 главные компоненты объясняют 74% вариации данных. Посмотрим это на графике:
 
 ```{r}
-fviz_eig(pima_full.pca, 
+factoextra::fviz_eig(pima_full.pca, 
          addlabels = T, 
          ylim = c(0, 40))
 ```
@@ -858,7 +862,7 @@ fviz_eig(pima_full.pca,
 Мы можем начать анализировать, как наши переменные связаны с PC1 и PC2. Посмотрим на график ниже:
 
 ```{r}
-fviz_pca_var(pima_full.pca, col.var = "contrib")
+factoextra::fviz_pca_var(pima_full.pca, col.var = "contrib")
 ```
 
 Подсказка для интерпретации графика [здесь](https://bioinfo4all.files.wordpress.com/2021/01/principal-component-analysis-pca-1.png?w=2048).
@@ -884,7 +888,7 @@ fviz_pca_var(pima_full.pca, col.var = "contrib")
 Мы также можем отдельно посмотреть на, например, топ 3 самых важных переменных с т.зр. их вариации в PC1 и PC2:
 
 ```{r}
-fviz_pca_var(pima_full.pca, 
+factoextra::fviz_pca_var(pima_full.pca, 
              select.var = list(contrib = 3), # Задаём число компонент здесь 
              col.var = "contrib")
 ```
@@ -900,9 +904,9 @@ fviz_pca_var(pima_full.pca,
 Посмотрим из чего состоят 1, 2 и 3 главные компоненты:
 
 ```{r}
-fviz_contrib(pima_full.pca, choice = "var", axes = 1, top = 24) # 1
-fviz_contrib(pima_full.pca, choice = "var", axes = 2, top = 24) # 2
-fviz_contrib(pima_full.pca, choice = "var", axes = 3, top = 24) # 3
+factoextra::fviz_contrib(pima_full.pca, choice = "var", axes = 1, top = 24) # 1
+factoextra::fviz_contrib(pima_full.pca, choice = "var", axes = 2, top = 24) # 2
+factoextra::fviz_contrib(pima_full.pca, choice = "var", axes = 3, top = 24) # 3
 ```
 
 

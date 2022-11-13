@@ -1,0 +1,194 @@
+---
+title: "Домашнее задание №2"
+author: "Liliya"
+date: "2022-11-13"
+output: 
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: pygments
+    smooth_scroll: no
+    theme: united
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    toc_position: right
+---
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Загрузим данные и пакеты
+
+```{r}
+# Если у вас не установлены какие-то из библиотек ниже, то установить их можно следующей командой. Эти библиотеки пригодятся нам во время занятия, но подгружать в library() мы их будем тогда, когда будем затрагивать соответствующую тему.
+# install.packages(c('ggpubr', 'plotly', 'corrplot', 'corrr', 'ggfortify', 'pheatmap', 'factoextra', 'FactoMineR', 'ggbiplot'))
+
+# Загрузим библиотеки
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+
+insurance <- read.csv('data/insurance_cost.csv')
+
+# Сделаем более детализированную переменную возрастных групп
+#pima <- pima %>% 
+#  mutate(
+#    diabetes_ch = as.character(diabetes),
+#    age_group = case_when(
+#      age < 31 ~ "21-30",
+#      age >= 31 & age < 41 ~ "31-40",
+#      age >= 41 & age < 51 ~ "41-50",
+#      age >= 51 & age < 61 ~ "51-60",
+#      age >= 61 ~ "60+"
+#    ))
+#
+#table(pima$age_group)
+```
+
+# 2. Интерактивный plotly график отношения индекса массы тела и трат на страховку. Раскраска - по колонке smoker
+
+Загрузим библиотеку: 
+
+```{r}
+# install.packages("plotly")
+# или 
+# devtools::install_github("ropensci/plotly")
+library(plotly)
+
+skimr::skim(insurance)
+```
+
+```{r}
+plot_ly(
+  data = insurance,
+  x = ~ charges,
+  y = ~ bmi,
+  color = ~smoker
+)   %>%
+  layout(
+    title = 'Отношение индекса массы тела и расходов на страховку',
+    yaxis = list(title = 'ИМТ',
+                 zeroline = FALSE),  # Уберём выделения нулевых осей по y
+    xaxis = list(title = 'Расходы на страховку',
+                 zeroline = FALSE)) # Уберём выделения нулевых осей по x
+
+
+```
+
+# 3. График отношения индекса массы тела и трат на страховку. Раскраска - по колонке smoker (с помощью ggplot)
+
+Загрузим библиотеку:
+```{r warning=FALSE}
+library(ggplot2)
+library(magrittr)
+```
+
+```{r}
+insurance %>% 
+  #filter(mass != 0 & triceps != 0) %>% 
+  ggplot(aes(x = charges, y = bmi, color = smoker)) + 
+    geom_point(size=3) +
+ theme_minimal() +
+ ggtitle('Отношение индекса массы тела и расходов на страховку') +
+ theme(axis.text.x = element_text(size = 14)) 
+```
+
+
+# 4. Корреляционный анализ данных insurance_cost
+
+```{r}
+library(corrplot)
+```
+Получаем объект матрицы:
+```{r}
+# Для более "чистого" результата, избавляемся от ошибочных значений
+insurance_numeric <- insurance %>% 
+  #filter(glucose != 0 & pressure != 0 & triceps != 0 & insulin != 0 & mass != 0 & age != 0 ) %>% 
+  select(is.integer | is.numeric) # Обратите внимание, в dplyr можно задавать выборку колонок через команды определения формата данных
+
+head(insurance_numeric)
+```
+
+```{r}
+# Получаем непосредственно матрицу
+insurance_cor <- cor(insurance_numeric)
+insurance_cor
+```
+
+Визуализируем её в corplot:
+```{r}
+corrplot(insurance_cor, method = 'number')
+```
+```{r}
+library(corrr)
+```
+```{r}
+insurance_cor %>% 
+  network_plot(min_cor = .0)
+```
+```{r}
+COL1(sequential = c("Oranges", "Purples", "Reds", "Blues", "Greens", 
+                    "Greys", "OrRd", "YlOrRd", "YlOrBr", "YlGn"), n = 200)
+
+COL2(diverging = c("RdBu", "BrBG", "PiYG", "PRGn", "PuOr", "RdYlBu"), n = 200)
+```
+
+```{r}
+corrplot(insurance_cor, order = 'AOE', col = COL2('RdBu', 10))
+```
+```{r}
+corrplot(insurance_cor, order = 'AOE', cl.pos = 'b', tl.pos = 'd',
+         col = COL2('PRGn'), diag = FALSE)
+```
+
+# 5. One hot-encoding
+Превратим все номинативные переменные в бинарные/дамми. 
+Т.е. sex и smoker сделаем бинарными (1/0), а каждое уникальное значение region – отдельной колонкой, где 1 говорит о наличии этого признака для наблюдения, а 0 – об отсутствии. 
+
+```{r}
+install.packages('fastDummies')
+library('fastDummies')
+```
+```{r}
+insurance_new <- dummy_cols(insurance_cost, select_columns = c('sex','smoker','region'))
+
+```
+
+Создим новый датафрейм, где вы оставите только нумерические переменные.
+```{r}
+insurance_new_num <- insurance_new %>% 
+  select(is.integer | is.numeric) # Обратите внимание, в dplyr можно задавать выборку колонок через команды определения формата данных
+```
+
+# 6. Иерархическая кластеризация
+Стандартизируем значения:
+```{r}
+insurance_new_num_scaled <- scale(insurance_new_num)
+```
+
+Создаем матрицу дистанций:
+```{r}
+insurance_new_dist <- dist(insurance_new_num_scaled, method = "euclidean")
+as.matrix(insurance_new_dist)[1:6, 1:6]
+```
+
+Высчитываем дендрограмму кластеров:
+```{r}
+insurance_new_hc <- hclust(d = insurance_new_dist, method = "ward.D2")
+insurance_new_gower <- cluster::daisy(insurance_new_dist, metric = "gower")
+```
+Визуализируем:
+```{r}
+fviz_dend(insurance_new_hc, cex = 0.6) # cex() - размер лейблов
+```
+
+(7) Раскрасим кластеры разными цветами
+Допустим оптимальное количество кластеров = 5.
+```{r}
+insurance_new_hc_k5 <- cutree(insurance_new_hc, 
+                          k = 5) # Создаём вектор принадлежности к кластерам
+```
