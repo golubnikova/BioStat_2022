@@ -1,0 +1,649 @@
+---
+title: "Введение в дисперсионный анализ (ANOVA)"
+author: "Matvei Slavenko"
+date: '09.07.2022'
+output: 
+  slidy_presentation:
+    duration: 90
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+
+# function for computing mean, DS, max and min values
+min.mean.sd.max <- function(x) {
+  r <- c(mean(x) - 3*sd(x), mean(x) - sd(x), mean(x), mean(x) + sd(x), mean(x) + 3*sd(x))
+  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
+  r
+}
+```
+
+## Данные. Генеральная совокупность и рабочая выборка.
+
+Файл `soccer.csv`. 
+
+По-прежнему работаем с футболистами: имя, позиция на поле (защитник, форвард, голкипер или полузащитник), гражданство, возраст и рост.
+
+Размер рабочей выборки чуть больше: 150 человек.
+
+```{r}
+soccer_general <- read.csv("soccer.csv", sep=";")[, 2:6] %>%
+  mutate(Position = as.factor(Position),
+         Nationality = as.factor(Nationality),
+         Age = as.numeric(Age),
+         Height = as.numeric(Height)) %>%
+  filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian"))
+```
+
+```{r}
+set.seed(1)
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 150), ] %>%
+  mutate(Nationality = factor(Nationality))
+```
+
+
+Дисклеймер: _Не совсем корректно, конечными генеральными совокупностями занимается не классическая статистика, а sample surveys. Но для сегодняшних целей пойдет._
+
+## В предыдущих сериях
+
+```{r out.extra = 'style="float:left; padding:10px"'}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+* Попарные сравнения
+* Попарных сравнений много, поэтому поправки
+* Иными словами: а есть ли связь между позицией и средним ростом футболиста?
+  * СВЯЗЬ
+  * СРЕДНИМ РОСТОМ
+
+## Условное математическое ожидание aka математический `filter(...) %>% mean` 
+
+Для каждого футболиста мы записывали его рост ($Y_i$) и позицию на поле ($D_i$). То есть i-тое наблюдение -- это вектор $(Y_i; D_i)$. В прошлый раз мы занимались защитниками (defenders). Средний рост в группе защитников мы можем понимать как средний рост футболиста при условии, что он защитник -> условное среднее, conditional expectation.
+
+Записываем так: $\mathsf{E}[Y|D = \text{Defender}]$.
+
+Если мы не завели специальное обозначение, можем писать полнее: $\mathsf{E}[Age|D = \text{Defender}]$.
+
+_УМО -- один из способов концептуализировать информацию, которую несет в себе позиция на поле о росте футболиста._
+
+Условный средний рост футболиста в генеральной совокупности при условии, что он защитник:
+
+```{r}
+soccer_general %>% filter(Position == "Defender") %>% pull(Height) %>% mean
+```
+
+Точечная оценка среднего роста футболиста при условии, что он защитник:
+```{r}
+soccer_wrk %>% filter(Position == "Defender") %>% pull(Height) %>% mean
+```
+
+
+## В предыдущих сериях: новый взгляд
+
+```{r out.extra = 'style="float:left; padding:10px"'}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+Обозначим реальные условные средние:
+\begin{align*}
+ \mu_{Def}  &= \mathsf{E}[Y| D = \text{Defender}] \\
+ \mu_{For}  &= \mathsf{E}[Y| D = \text{Forward}] \\ 
+ \mu_{Goal}  &= \mathsf{E}[Y| D = \text{Goalkeeper}] \\
+ \mu_{Mid}  &= \mathsf{E}[Y| D = \text{Midfielder}]
+\end{align*}
+
+## В предыдущих сериях: новый взгляд
+
+```{r out.extra = 'style="float:left; padding:10px"'}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+Мы тестировали:
+
+\begin{gather*}
+H_0^1: \mu_{Def} - \mu_{For} = 0 \qquad vs. \qquad H_1^1: \mu_{Def} - \mu_{For} \neq 0 \\
+H_0^2: \mu_{Def} - \mu_{Goal} = 0 \qquad vs. \qquad H_1^2: \mu_{Def} - \mu_{Goal} \neq 0 \\
+\ldots \\
+H_0^6: \mu_{Goal} - \mu_{Mid} = 0 \qquad vs. \qquad H_1^6: \mu_{Goal} - \mu_{Mid} \neq 0 
+\end{gather*}
+
+
+## В предыдущих сериях: новый взгляд
+
+```{r out.extra = 'style="float:left; padding:10px"'}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+* Иными словами: а есть ли связь между позицией и средним ростом футболиста?
+
+Это можно сформулировать иначе:
+\begin{align*}
+& H_0\!: \mu_{Def} = \ldots = \mu_{Mid} \\
+vs. \\
+& H_1\!: \exists i,j: \mu_i \neq \mu_j
+\end{align*}
+
+Т.е. _"(условный) средний рост футболиста не ассоциирован с его позицией на поле"_ или _"позиция игрока на поле не несет информации о среднем росте футболиста"_.
+
+## В предыдущих сериях: новый взгляд
+
+```{r out.extra = 'style="float:left; padding:10px"'}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+Т.е. _"(условный) средний рост футболиста не ассоциирован с его позицией на поле"_ или _"позиция игрока на поле не несет информации о среднем росте футболиста"_.
+
+* Моделированием условного математического ожидания (среднего) занимается регрессия.
+* А есть ли связь между позицией и средним ростом футболиста? Такую гипотезу тестирует AN(C)OVA -- Analysis of (Co)Variance -- Дисперсионный / ковариационный анализ -- частный случай регрессионной модели.
+* _УМО -- один из способов концептуализировать информацию, которую несет в себе позиция на поле о росте футболиста._
+  * Как измерить эту информацию?
+
+## Новый взгляд на среднее и дисперсию
+
+$$ \mathsf{E}X := \int_{\mathbb{R}} xf_X(x)dx  \qquad \mathsf{var}X := \mathsf{E}\left(X - \mathsf{E}X\right)^2$$
+
+$$ \overline{X_n} := \frac{1}{n} \sum_{i=1}^n X_i \qquad S_n^2 := \frac{1}{n-1} \sum_{i=1}^n(X_i - \overline{X_n})^2 $$
+
+* Среднее -- это в каком-то смысле оптимальное выражение распределения одним числом.
+* Дисперсия -- мера (не)оптимальности -- мера неопределенности.
+
+$$\mathsf{E}X = \arg \min_{a\in\mathbb{R}} \mathsf{E}\left(X-a\right)^2$$
+
+* Дисперсия -- это сумма квадратов.
+
+## Две модели для среднего
+
+```{r fig.align='center', out.width='70%', echo=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2)) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic()
+```
+
+## Две модели для среднего
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic() +
+  geom_hline(yintercept = mean(soccer_wrk$Height),
+             lwd = 1,
+             colour = "salmon2") +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2))
+```
+
+1. Простая модель M0: посчитать среднее по всем футболистам.
+
+## Две модели для среднего
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic() +
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot",
+               colour = "cadetblue3") +
+  geom_hline(yintercept = mean(soccer_wrk$Height),
+             lwd = 1,
+             colour = "salmon2") +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2))
+```
+
+1. Простая модель M0: посчитать среднее по всем футболистам.
+2. Более сложная модель М1: посчитать среднее в каждой группе отдельно.
+
+Имеет ли смысл рассматривать более сложную модель, или простая описывает данные "достаточно хорошо"?
+
+## Две модели для среднего
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic() +
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot",
+               colour = "cadetblue3") +
+  geom_hline(yintercept = mean(soccer_wrk$Height),
+             lwd = 1,
+             colour = "salmon2") +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2))
+```
+
+1. Простая модель M0: посчитать среднее по всем футболистам.
+2. Более сложная модель М1: посчитать среднее в каждой группе отдельно.
+
+Имеет ли смысл рассматривать более сложную модель, или простая описывает данные "достаточно хорошо"?
+
+$$ H_0\!: \mu_{Def} = \ldots = \mu_{Mid} \quad vs. \quad H_1\!: \exists i,j: \mu_i \neq \mu_j $$
+
+Если справедлива гипотеза, то обе модели описывают одно и то же число! Значит, если справедлива гипотеза, то оценки не должны отличаться слишком сильно. Или: conditioning позицией на поле не должен слишком сильно снижать неопределенность.
+
+
+
+## Две модели для среднего
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic() +
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot",
+               colour = "cadetblue3") +
+  geom_hline(yintercept = mean(soccer_wrk$Height),
+             lwd = 1,
+             colour = "salmon2") +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2))
+```
+
+Если справедлива гипотеза, то обе модели описывают одно и то же число! Значит, если справедлива гипотеза, то оценки не должны отличаться слишком сильно. Или: conditioning позицией на поле не должен слишком сильно снижать неопределенность.
+
+__Неопределенность простой модели M0:__ дисперсия!
+
+$$S_n^2 := \frac{1}{n-1} \sum_{i=1}^n(Y_i - \overline{Y_n})^2$$
+
+Ну, или как сумма квадратов (полная, total sum of squares):
+
+$$SS_T := \sum_{i=1}^n(Y_i - \overline{Y_n})^2 $$
+
+
+## Две модели для среднего
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic() +
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot",
+               colour = "cadetblue3") +
+  geom_hline(yintercept = mean(soccer_wrk$Height),
+             lwd = 1,
+             colour = "salmon2") +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2))
+```
+
+Если справедлива гипотеза, то обе модели описывают одно и то же число! Значит, если справедлива гипотеза, то оценки не должны отличаться слишком сильно. Или: conditioning позицией на поле не должен слишком сильно снижать неопределенность.
+
+__Неопределенность сложной модели M1:__ дисперсия! 
+
+Ну, почти. Поправим формулу так, чтобы мы учитывали то, что в разных группах, возможно, разные средние. Обозначим среднее, посчитанное в группе $d$, как $\widehat{\mu}_{d}$.
+
+$$S_n^2 := \frac{1}{n-1} \sum_{i=1}^n(Y_i - \widehat{\mu}_{D_i})^2$$
+
+Ну, или как сумма квадратов (остаточная, residual sum of squares):
+
+$$SS_e := \sum_{i=1}^n(Y_i - \widehat{\mu}_{D_i})^2 $$
+
+## Две модели для среднего
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic() +
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot",
+               colour = "cadetblue3") +
+  geom_hline(yintercept = mean(soccer_wrk$Height),
+             lwd = 1,
+             colour = "salmon2") +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2))
+```
+
+Если справедлива гипотеза, то обе модели описывают одно и то же число! Значит, если справедлива гипотеза, то оценки не должны отличаться слишком сильно. Или: conditioning позицией на поле не должен слишком сильно снижать неопределенность.
+
+__Неопределенность простой модели M0:__ полная сумма квадратов $SS_T := \sum_{i=1}^n(Y_i - \overline{Y_n})^2$
+__Неопределенность сложной модели M1:__ остаточная сумма квадратов $SS_e := \sum_{i=1}^n(Y_i - \widehat{\mu}_{D_i})^2$
+
+Посчитаем, какой процент неопределенности был "объяснен" позицией на поле:
+
+$$ \frac{SS_T - SS_e}{SS_T} $$
+
+Кажется, это может быть интересная метрика (спойлер: это же $R^2$)!
+
+## Две модели для среднего. F-test.
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(y = Height, x = Position), data = soccer_wrk) +
+  ylim(155, 210) + 
+  ggtitle("Boxplot: mean + sd") + 
+  xlab("Position") + 
+  ylab("Height (cm)") +
+  theme_classic() +
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot",
+               colour = "cadetblue3") +
+  geom_hline(yintercept = mean(soccer_wrk$Height),
+             lwd = 1,
+             colour = "salmon2") +
+  geom_jitter(colour = "cornsilk4", position=position_jitter(width=.2))
+```
+
+Чтобы тестировать, нам нужно знать распределение тестовой статистики. Используют:
+
+$$F := \frac{\frac{SS_T - SS_e}{K-1}}{\frac{SS_e}{n-K}}$$
+
+$K$ -- количество групп.
+
+$n$ -- количество наблюдений.
+
+## Условия для тестирования. F-test.
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+Условия:
+
+* __Нормальность.__ Распределение внутри каждой группы нормально.
+* __Гомоскедастичность__ ака равенство дисперсий. Дисперсии в каждой группе одинаковы.
+
+Если условия выполнены, то:
+
+$$F := \frac{\frac{SS_T - SS_e}{K-1}}{\frac{SS_e}{n-K}} \sim F_{K-1, n-K}$$
+
+Тест точный!
+
+
+## F-test в нашем случае.
+
+Посчитаем сначала руками.
+
+$K=4$, $n=150$.
+
+Посчитаем $SS_T$.
+
+Два варианта: 
+
+```{r}
+soccer_wrk %>% pull(Height) %>% var*(nrow(soccer_wrk)-1)
+```
+
+```{r}
+SST <- with(soccer_wrk, (sum(
+  (Height - mean(Height))^2
+  )))
+
+SST
+```
+
+## F-test в нашем случае.
+
+Посчитаем сначала руками.
+
+$K=4$, $n=150$
+
+Посчитаем $SS_e$
+
+```{r}
+SSe <- soccer_wrk %>% group_by(Position) %>% mutate(residuals = Height - mean(Height)) %>%
+  with(sum(residuals^2))
+
+SSe
+```
+
+## F-test в нашем случае.
+
+Посчитаем сначала руками.
+
+$K=4$, $n=150$
+
+Итого:
+
+```{r}
+SST
+SSe
+SST-SSe
+
+F <- (SST - SSe)/3 / ((SSe)/(150-3))
+F
+```
+
+## F-test в нашем случае.
+
+Итого:
+
+```{r}
+SST
+SSe
+SST-SSe
+
+F <- (SST - SSe)/3 / ((SSe)/(150-3))
+F
+```
+
+Автоматически:
+
+```{r}
+lm(Height ~ Position, data = soccer_wrk) %>% anova
+```
+
+## Нарушение условий для тестирования. F-test.
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE, message=FALSE, warning=FALSE}
+soccer_wrk %>%
+  with(
+    boxplot(Height ~ Position, col = "cadetblue3", pch = 20,
+            ylab = "Height (cm)")
+  )
+```
+
+* __Нормальность.__ Если данные распределены ненормально, то тест все равно асимптотически консистентный. То есть, работает, если данных достаточно.
+* __Гетероскедастичность__ ака неравенство дисперсий. И снова Велш (Welch) приходит нам на помощь. F-test Велша работает и в случае негомоскедастичных моделей, при достаточном количестве наблюдений.
+  * Второй вариант: сбалансированная (balanced) ANOVA. Если в группах +- одинаковое количество наблюдений, обычная ANOVA работает при достаточном количестве наблюдений.
+* Unbalanced ANOVA: лучше всего тест работает тогда, когда в каждой группе +- одинаковое количество наблюдений.
+
+## Нарушение условий для тестирования. F-test.
+
+Стандартная ANOVA:
+
+```{r}
+aov(Height ~ Position, data = soccer_wrk) %>% summary
+```
+
+F-тест Велша:
+
+```{r}
+oneway.test(Height ~ Position, data = soccer_wrk)
+```
+
+## Промежуточные итоги
+
+1. Программистское `... %>% filter(Position = "Defender") %>% pull(Height) %>% mean` соответствует математическому $\mathsf{E}[Y|D = \text{Defender}]$ .
+2. Среднее -- в определенном смысле лучшее описание распределения одним числом. Дисперсия -- мера неопределенности.
+3. Пачку попарных t-тестов мы можем переформулировать с помощью одного F-теста. При этом мы теряем информацию о том, какие именно группы отличаются в пользу (надеемся) большей силы теста.
+4. Если данных не очень много, нужно проконтролировать нормальность и гомоскедастичность, например, с помощью боксплотов или qq- и scale-location plots.
+5. Если данных много, то Велш все спасет.
+6. Совсем уж экстремальные выбросы стоит исследовать более подробно.
+
+## Но я хочу доверительные интервалы! Post hoc анализ.
+
+1. Обычно практикуемый подход: запустить F-test, в случае маленького p-value разбираться подробнее (поэтому post hoc).
+2. Специальный случай: есть процедуры, контролирующие FWER, более сильные чем Бонферрони, Холм и Ко.
+3. Процедур много: Даннетт, Тьюки, доверительные эллипсоиды, дуальные к F-тесту...
+
+Мы остановимся на относительно новой процедуре: процедура Хоторна-Бретца-Вестфала (Hothorn, Bretz, Westfall), основанной на многомерном t-распределении.
+
+Итак, мы хотим доверительные интервалы для разницы роста; попарно сравнить игроков на разных позициях; контролировать FWER.
+
+Стартуем со стандартными предположениями: __нормальность__ и __гомоскедастичность__.
+
+## Но я хочу доверительные интервалы! Post hoc анализ.
+
+Еще раз проверим, что __позиция__ на поле _ассоциирована_ со _средним_ __ростом__ футболиста.
+
+```{r}
+aov(Height ~ Position, data = soccer_wrk) %>% summary
+
+oneway.test(Height ~ Position, data = soccer_wrk)
+
+```
+
+## Но я хочу доверительные интервалы! Post hoc анализ.
+
+Можем приступить к post hoc анализу.
+
+```{r message=FALSE}
+library(multcomp)
+```
+
+
+```{r}
+
+
+m0 <- lm(Height ~ Position, data = soccer_wrk)
+HBW.comp <- m0 %>%  glht(linfct = mcp(Position = "Tukey"))
+
+```
+
+Tukey сигнализирует, что мы хотим сравнить каждую группу с каждой. __Анализ выполняется не методом Тьюки__, а методом Хоторна-Бретца-Вестфалла!
+
+## Но я хочу доверительные интервалы! Post hoc анализ.
+
+Указанные доверительные интервалы и p-values уже рассчитаны с учетом необходимости контролировать FWER.
+
+```{r}
+HBW.comp %>% summary()
+```
+
+## Но я хочу доверительные интервалы! Post hoc анализ.
+
+Указанные доверительные интервалы и p-values уже рассчитаны с учетом необходимости контролировать FWER.
+
+```{r}
+HBW.comp %>% confint()
+```
+
+## Но я хочу доверительные интервалы! Post hoc анализ.
+
+Красивые картиночки работают "из коробки".
+
+```{r fig.width=10, fig.align='center'}
+par(mar = c(5, 10, 4, 2)+0.1)
+HBW.comp %>% plot(xlab = "Height difference (cm)")
+par(mar = c(5, 10, 4, 2)+0.1)
+```
+
+## Но я хочу доверительные интервалы! Post hoc анализ.
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE}
+par(mar = c(5, 10, 4, 2)+0.1)
+HBW.comp %>% plot(xlab = "Height difference (cm)")
+par(mar = c(5, 10, 4, 2)+0.1)
+```
+
+В случае, если соблюдены условия __нормальности__ и __гомоскедастичности__, метод точный, т.е. работает и для малых выборок. 
+Метод использует квантили многомерного t-распределения, которые считаются методом Монте-Карло. Если нужна 100% воспроизводимость, не забудьте использовать `set.seed`!
+
+Это очень гибкий метод: можно не только попарно сравнивать группы между собой, можно тестировать любые наборы линейных гипотез. К сожалению, это за рамками сегодняшнего занятия.
+
+Нарушение условий использования:
+
+1. Если нарушено условие __нормальности__, то дополнительных телодвижений делать не нужно: для достаточно больших выборок метод работает (асимптотическая консистентность).
+2. Если вдобавок нарушено условие __гомоскедастичности__, то нужно кое-что поправить.
+
+
+## Но я хочу доверительные интервалы! Post hoc анализ для гетероскедастичных данных.
+
+В случае гетероскедастичных данных необходимо "руками" оценить матрицу вариации-ковариации. Для этого используем библиотеку `sandwich`.
+
+```{r}
+library(sandwich)
+
+HBW.comp.hetero <- m0 %>%  glht(linfct = mcp(Position = "Tukey"), 
+                                vcov = vcovHC(m0, type = "HC4"))
+```
+
+```{r}
+HBW.comp %>% summary
+HBW.comp.hetero %>% summary
+```
+
+## Но я хочу доверительные интервалы! Post hoc анализ для гетероскедастичных данных.
+
+В случае гетероскедастичных данных необходимо "руками" оценить матрицу вариации-ковариации. Для этого используем библиотеку `sandwich`.
+
+```{r}
+library(sandwich)
+
+HBW.comp.hetero <- m0 %>%  glht(linfct = mcp(Position = "Tukey"), 
+                                vcov = vcovHC(m0, type = "HC4"))
+```
+
+```{r}
+HBW.comp %>% confint
+HBW.comp.hetero %>% confint
+```
+
+## Но я хочу доверительные интервалы! Post hoc анализ для гетероскедастичных данных.
+
+```{r fig.width=15, fig.align='center'}
+par(mar = c(5, 10, 4, 2)+0.1, mfrow = c(1, 2))
+HBW.comp %>% plot(xlab = "Height difference (cm)")
+HBW.comp.hetero %>% plot(xlab = "Height difference (cm)")
+par(mar = c(5, 10, 4, 2)+0.1)
+```
+
+## Но я хочу доверительные интервалы! Post hoc анализ для гетероскедастичных данных.
+
+```{r out.extra = 'style="float:left; padding:10px"', echo=FALSE}
+par(mar = c(5, 10, 4, 2)+0.1)
+HBW.comp.hetero %>% plot(xlab = "Height difference (cm)")
+par(mar = c(5, 10, 4, 2)+0.1)
+```
+
+Для того, чтобы справиться с гетероскедастичностью, мы использовали так называемый sandwich estimator.
+
+__Внимание:__ сендвичи имеют обыкновение сходиться к реальной дисперсии снизу. На маленькой выборке риск ошибки первого рода повышен!
+
+## Что дальше?
+
+1. Two-way ANOVA, AN(C)OVA и иже с ними -- все это частный случай линейной регрессии.
+2. А если я знаю, что в группах данные распределены не нормально, а экспоненциально? Без паники, вам на помощь идут обобщенные линейные модели (generalised linear models -- GLM).
+3. А если у меня зависимые данные (панельные, лонгитудинальные...)? Смешанные модели (Linear Mixed Models) и/или обобщенные оценочные уравнения (Generalized Estimating Equations -- GEE).
+
+## Литература
+
+1. Монументальный труд Арношта Комарка [Linear Regression Course Notes](https://www2.karlin.mff.cuni.cz/~komarek/vyuka/2020_21/nmsa407/2021-NMSA407-notes.pdf)
+2. Продолжение, касающееся GLM и частично GEE/LMM: [Advanced Regression Models Course Notes](https://www2.karlin.mff.cuni.cz/~kulich/vyuka/pokreg/doc/advreg_notes_ext_220218.pdf) авторства Михала Кулиха.
