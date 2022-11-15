@@ -1,0 +1,116 @@
+---
+title: "Introduction to Rstudio auto. HW3"
+author: "Liliya"
+date: "2022-11-15"
+output: html_document
+---
+
+# Статистический отчет для data
+# - Cтатистический отчёт с таблицами описательной статистики по всем имеющимся визитам по всем группам для каждой переменной
+# - Дополнительно таблицы со сравнением групп
+
+### Загрузка библиотек
+
+```{r setup, include=FALSE}
+
+install.packages(c("dplyr", "tidyr", "readxl", "purrr", "", "tibble", "ggplot2", "ggpubr","tidyverse", "flextable"))
+install.packages("readr")
+
+# dplyr - базовая грамматика манипуляции данных
+# tidyr - приведение данных к аккуратному виду 
+# ggplot2, ggpubr - визуализация данных
+# purrr - дополнительные функции для функционального программирования
+# tidyverse - метапакет, содержащий в себе основные пакеты для автоматизации анализа данных
+# tibble - улучшенный аналог data.frame
+# readxl - чтение данных
+# flextable - статистические пакеты для печати
+# stringr - извлечение подстроки
+# DescTools, psych - пакеты со статистическими финкциями
+
+#detach(package:dplyr)
+
+
+```
+
+
+### Чтение данных
+```{r}
+library('readxl')
+library('readr')
+data <- readxl::read_excel('data_excel.xlsx')
+data <- readr::read_tsv("data_excel.txt")
+```
+
+### Сводная статистика
+Базовая функция `summary`, дающая нам сводку по всем типам переменных: 
+ - для количественных переменных возвращает: минимум, первый квартиль, медиану, среднее, третий квартиль, максимум;
+ - для категориальных/строковых переменных возвращает просто количество каждой категории.
+```{r}
+summary(data)
+
+```
+
+
+```{r}
+library('psych')
+psych::describe(data, na.rm = TRUE, skew = FALSE, ranges = TRUE)
+```
+
+
+### Статистика по группам
+```{r}
+table(data$Группа, data$Возраст)
+table(data$Группа, data$Пол)
+table(data$Группа, data$Рост)
+table(data$Группа, data$`Группа крови`)
+```
+
+### Статистика по визитам
+
+
+### Расчёт средних значений по Группам
+```{r}
+library(`dplyr`)
+data %>% 
+  select(`Группа`, where(is.numeric)) %>%
+  group_by(`Группа`) %>%
+  dplyr::summarise(across(where(is.numeric), function(x) mean(x, na.rm = TRUE)))
+
+```
+### Расчёт статистической таблицы для количественных и категориальных переменных
+
+```{r}
+library('tidyr')
+statistics <- list(
+      `Количество субъектов` = ~length(.x),
+      `Количество (есть данные)` = ~sum(!is.na(.x)),
+      `Нет данных` = ~sum(is.na(.x)),
+      `Ср. знач.` = ~ifelse(sum(!is.na(.x)) == 0, "Н/П*", mean(.x, na.rm = TRUE) %>% round(2) %>% as.character()),
+      `Станд. отклон.` = ~ifelse(sum(!is.na(.x)) < 3, "Н/П*", sd(.x, na.rm = TRUE) %>% round(2) %>% as.character()),
+      `95% ДИ для среднего` = ~sd(.x, na.rm = TRUE) %>% round(2) %>% as.character(),
+      `мин. - макс.` = ~ifelse(sum(!is.na(.x)) == 0, "Н/П*", paste0(min(.x, na.rm = TRUE) %>% round(2), " - ", max(.x, na.rm = TRUE) %>% round(2))),
+      `Медиана` = ~ifelse(sum(!is.na(.x)) == 0, "Н/П*", median(.x, na.rm = TRUE) %>% round(2) %>% as.character()),
+      `Q1 - Q3` = ~ifelse(sum(!is.na(.x)) == 0, "Н/П*", paste0(quantile(.x, 0.25, na.rm = TRUE) %>% round(2), " - ", quantile(.x, 0.75, na.rm = TRUE) %>% round(2)))
+)
+
+# для количественных
+data %>%
+  select(`Группа`, where(is.numeric)) %>%
+  group_by(`Группа`) %>%
+  summarise(across(where(is.numeric), statistics)) %>%
+  pivot_longer(!`Группа`) %>%
+  separate(name, into = c("Переменная", "Статистика"), sep - "__") %>%
+  rename(`Значение` - value)
+
+
+# для категориальных
+data %>%
+  select(`Группа`, where(is.factor)) %>%
+  mutate(`Группа крови` = `Группа крови` %>% as.character() %>% replace_na("Нет данных") %>% as.factor()) %>%
+  count(`Группа`, `Группа крови`) %>%
+  group_by(`Группа`) %>%
+  mutate(`Процент по группе` = (n / sum(n)) %>% round(4) %>% `*`(100) %>% str_c("%")) %>%
+  ungroup() %>%
+  mutate(`Процент по выборке` = (n / sum(n)) %>% round(4) %>% `*`(100) %>% str_c("%"))
+
+```
