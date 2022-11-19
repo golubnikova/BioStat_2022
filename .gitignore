@@ -1,0 +1,6 @@
+# R-related mess
+
+.RData
+.Rhistory
+/.Rproj.user
+*.Rproj
