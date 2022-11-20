@@ -827,6 +827,9 @@ plot_ly(data = pima_clear,
 ```{r}
 # Загрузим библиотеки
 #install.packages('devtools')
+#remotes::install_github("vqv/ggbiplot")
+#install.packages('ggbiplot')
+
 library(devtools)
 library(FactoMineR)
 library(ggbiplot)

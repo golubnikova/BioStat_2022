@@ -51,7 +51,7 @@ library(dbscan)
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '80%'}
-knitr::include_graphics("clust_example_2.png")
+#knitr::include_graphics("clust_example_2.png")
 ```
 </div>
 
@@ -61,7 +61,7 @@ knitr::include_graphics("clust_example_2.png")
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '80%'}
-knitr::include_graphics("clust_example_1.jpg")
+#knitr::include_graphics("clust_example_1.jpg")
 ```
 </div>
 
@@ -115,7 +115,7 @@ hs_scaled <- scale(hs_num)
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '80%'}
-knitr::include_graphics("Iris_dendrogram.png")
+#knitr::include_graphics("Iris_dendrogram.png")
 ```
 </div>
 "Длинна" дистанции обозначает меру схожести/разницы наблюдений - Высоту/Height (Крестовский остров ближе к Институт биоинформатики чем к Кудрово).
@@ -127,7 +127,7 @@ knitr::include_graphics("Iris_dendrogram.png")
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '80%'}
-knitr::include_graphics("Agglo-DIANA.png")
+#knitr::include_graphics("Agglo-DIANA.png")
 ```
 </div>
 
@@ -280,8 +280,8 @@ fviz_cluster(list(data = hs_dist, cluster = hs_dist.hc_h20),
 3.
 
 ```{r}
-
-fviz_dend(hs_dist.hc, 
+library('factoextra')
+factoextra::fviz_dend(hs_dist.hc, 
           k = 3, 
           cex = 0.5, 
           k_colors = c("#2E9FDF", "#E7B800", "#FC4E07"),
@@ -422,7 +422,7 @@ fviz_dend(hs.diana, cex = 0.6, k = 3)
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '80%'}
-knitr::include_graphics("kmeans_example_1.png")
+#knitr::include_graphics("kmeans_example_1.png")
 ```
 </div>
 
@@ -635,7 +635,7 @@ fviz_cluster(km.res, df, geom = "point",
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '100%'}
-knitr::include_graphics("dbscan_example.png")
+#knitr::include_graphics("dbscan_example.png")
 ```
 </div>
 
@@ -649,13 +649,13 @@ knitr::include_graphics("dbscan_example.png")
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '50%'}
-knitr::include_graphics("dbscan_1.png")
+#knitr::include_graphics("dbscan_1.png")
 ```
 </div>
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '60%'}
-knitr::include_graphics("dbscan_2.png")
+#knitr::include_graphics("dbscan_2.png")
 ```
 </div>
 
@@ -760,7 +760,7 @@ cor(hs_dist, hs_dist.coph)
 
 <div align="center">
 ```{r, echo=FALSE, out.width = '20%'}
-knitr::include_graphics("Hopkins_stat.png")
+#knitr::include_graphics("Hopkins_stat.png")
 ```
 </div>
 

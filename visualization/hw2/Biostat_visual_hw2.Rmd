@@ -25,7 +25,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Если у вас не установлены какие-то из библиотек ниже, то установить их можно следующей командой. Эти библиотеки пригодятся нам во время занятия, но подгружать в library() мы их будем тогда, когда будем затрагивать соответствующую тему.
-install.packages(c('ggpubr', 'plotly', 'corrplot', 'corrr', 'ggfortify', 'pheatmap', 'factoextra', 'FactoMineR', 'ggbiplot'))
+#install.packages(c('ggpubr', 'plotly', 'corrplot', 'corrr', 'ggfortify', 'pheatmap', 'factoextra', 'FactoMineR', 'ggbiplot'))
 #install.packages("pheatmap")
 
 # Загрузим библиотеки
@@ -33,21 +33,7 @@ library(dplyr)
 library(ggplot2)
 library(ggpubr)
 
-insurance <- read.csv('data/insurance_cost.csv')
-
-# Сделаем более детализированную переменную возрастных групп
-#pima <- pima %>% 
-#  mutate(
-#    diabetes_ch = as.character(diabetes),
-#    age_group = case_when(
-#      age < 31 ~ "21-30",
-#      age >= 31 & age < 41 ~ "31-40",
-#      age >= 41 & age < 51 ~ "41-50",
-#      age >= 51 & age < 61 ~ "51-60",
-#      age >= 61 ~ "60+"
-#    ))
-#
-#table(pima$age_group)
+insc <- read.csv('data/insurance_cost.csv')
 ```
 
 # 2. Интерактивный plotly график отношения индекса массы тела и трат на страховку. Раскраска - по колонке smoker
@@ -60,12 +46,12 @@ insurance <- read.csv('data/insurance_cost.csv')
 # devtools::install_github("ropensci/plotly")
 library(plotly)
 
-skimr::skim(insurance)
+skimr::skim(insc)
 ```
 
 ```{r}
 plot_ly(
-  data = insurance,
+  data = insc,
   x = ~ charges,
   y = ~ bmi,
   color = ~smoker
@@ -89,7 +75,7 @@ library(magrittr)
 ```
 
 ```{r}
-insurance %>% 
+insc %>% 
   #filter(mass != 0 & triceps != 0) %>% 
   ggplot(aes(x = charges, y = bmi, color = smoker)) + 
     geom_point(size=3) +
@@ -99,7 +85,7 @@ insurance %>%
 ```
 
 
-# 4. Корреляционный анализ данных insurance_cost
+# 4. Корреляционный анализ данных insc_cost
 
 ```{r}
 library(corrplot)
@@ -107,30 +93,32 @@ library(corrplot)
 Получаем объект матрицы:
 ```{r}
 # Для более "чистого" результата, избавляемся от ошибочных значений
-insurance_numeric <- insurance %>% 
+insc_num <- insc %>% 
   #filter(glucose != 0 & pressure != 0 & triceps != 0 & insulin != 0 & mass != 0 & age != 0 ) %>% 
   select(is.integer | is.numeric) # Обратите внимание, в dplyr можно задавать выборку колонок через команды определения формата данных
 
-head(insurance_numeric)
+head(insc_num)
 ```
 
 ```{r}
 # Получаем непосредственно матрицу
-insurance_cor <- cor(insurance_numeric)
-insurance_cor
+insc_cor <- cor(insc_num)
+insc_cor
 ```
 
 Визуализируем её в corplot:
 ```{r}
-corrplot(insurance_cor, method = 'number')
+corrplot(insc_cor, method = 'number')
 ```
 ```{r}
 library(corrr)
 ```
+
 ```{r}
-insurance_cor %>% 
+insc_cor %>% 
   network_plot(min_cor = .0)
 ```
+
 ```{r}
 #install.packages("RColorBrewer")
 library('RColorBrewer')
@@ -142,10 +130,12 @@ COL2(diverging = c("RdBu", "BrBG", "PiYG", "PRGn", "PuOr", "RdYlBu"), n = 200)
 
 ```{r}
 library('corrplot')
-corrplot(insurance_cor, order = 'AOE', col = COL2('RdBu', 10))
+corrplot(insc_cor, order = 'AOE', col = COL2('RdBu', 10))
 ```
+
+
 ```{r}
-corrplot(insurance_cor, order = 'AOE', cl.pos = 'b', tl.pos = 'd',
+corrplot(insc_cor, order = 'AOE', cl.pos = 'b', tl.pos = 'd',
          col = COL2('PRGn'), diag = FALSE)
 ```
 
@@ -157,56 +147,58 @@ corrplot(insurance_cor, order = 'AOE', cl.pos = 'b', tl.pos = 'd',
 #install.packages('fastDummies')
 library('fastDummies')
 ```
+
 ```{r}
-insurance_new <- dummy_cols(insurance, select_columns = c('sex','smoker','region'))
+insc2 <- dummy_cols(insc, select_columns = c('sex','smoker','region'))
 
 ```
 
 Создим новый датафрейм, где вы оставите только нумерические переменные.
 ```{r}
-insurance_new_num <- insurance_new %>% 
+insc2_num <- insc2 %>% 
   select(is.integer | is.numeric) # Обратите внимание, в dplyr можно задавать выборку колонок через команды определения формата данных
+
 ```
 
 # 6. Иерархическая кластеризация
 Стандартизируем значения:
 ```{r}
-insurance_new_num_scaled <- scale(insurance_new_num)
+insc2_num.sc <- scale(insc2_num)
 ```
 
 Создаем матрицу дистанций:
 ```{r}
-#rownames(insurance_new_num_scaled) <- insurance_new_num_scaled[0,]
-insurance_new_num_scaled <- as.matrix(insurance_new_num_scaled)
-insurance_new_dist <- dist(insurance_new_num_scaled, method = "euclidean")
-#insurance_new_dist_wNames <- dist_setNames(insurance_new_dist, insurance_new_num_scaled[0,]) 
-as.matrix(insurance_new_dist)[1:6, 1:6]
+rownames(insc2_num.sc) <- insc2_num.sc[0,]
+
+insc2_dist <- dist(as.matrix(insc2_num.sc), method = "euclidean")
+as.matrix(insc2_dist)[1:6, 1:6]
 ```
 
 Высчитываем дендрограмму кластеров:
 ```{r}
-insurance_new_hc <- hclust(d = insurance_new_dist, method = "ward.D2")
-insurance_new_gower <- cluster::daisy(as.matrix(insurance_new_dist), metric = "gower")
+insc2_hc <- hclust(d = insc2_dist, method = "ward.D2")
+insc2_gower <- cluster::daisy(as.matrix(insc2_dist), metric = "gower")
 ```
+
 Визуализируем:
 ```{r}
 library('factoextra')
-fviz_dend(insurance_new_hc, cex = 0.6, label_cols = rownames(insurance_new_num)) # cex() - размер лейблов
+fviz_dend(insc2_hc, cex = 0.6, label_cols = rownames(insc2_num)) # cex() - размер лейблов
 ```
 
 (7) Раскрасим кластеры разными цветами
 Допустим, оптимальное количество кластеров = 5.
 ```{r}
-insurance_new_hc_k5 <- cutree(insurance_new_hc, 
+insc2_hc_k5 <- cutree(insc2_hc, 
                           k = 5) # Создаём вектор принадлежности к кластерам
-head(insurance_new_hc_k5, n = 4)
+head(insc2_hc_k5, n = 4)
 
-table(insurance_new_hc_k5)
+table(insc2_hc_k5)
 ```
 
 Визуализируем:
 ```{r}
-fviz_dend(insurance_new_hc, 
+fviz_dend(insc2_hc, 
           k = 5, # Задаём число кластеров
           cex = 0.5, # Задаем размер лейблов
           k_colors = c("#2E9FDF", "#E7B800", "#FC4E07", "#DEB887", "#5758BB"),
@@ -218,7 +210,7 @@ fviz_dend(insurance_new_hc,
 
 
 ```{r}
-fviz_cluster(list(data = insurance_new_dist, cluster = insurance_new_hc_k5, labels = rownames(insurance_new_num)),
+fviz_cluster(list(data = insc2_dist, cluster = insc2_hc_k5, labels = rownames(insc2_num)),
              palette = c("#2E9FDF", "#E7B800", "#FC4E07", "#DEB887", "#5758BB"),
              ellipse.type = "convex", # Объединить кластеры элипсом
              repel = TRUE, # Избежать наслоения лейблов
@@ -234,24 +226,22 @@ fviz_cluster(list(data = insurance_new_dist, cluster = insurance_new_hc_k5, labe
 ```{r}
 library('pheatmap')
 
-pheatmap(insurance_new_num_scaled)
-
+pheatmap(insc2_num.sc)
 ```
+
 # 9. Анализ данных методом PCA
 ```{r}
 
-insurance_new_num.pca <- prcomp(insurance_new_num[,c(1:12)], center = TRUE,scale. = TRUE)
+insc2_num.pca <- prcomp(insc2_num[,c(1:12)], center = TRUE,scale. = TRUE)
 
-summary(insurance_new_num.pca)
+summary(insc2_num.pca)
 
 
 #ggbiplot()
 
-#insurance_new_num_pc <- mutate(pc1 = region_)
+#insc2_num_pc <- mutate(pc1 = region_)
 ```
 
 ```{r}
-library(ggbiplot)
-
-ggbiplot(insurance_new_num.pca, labels = rownames(insurance_new_num))
+factoextra::fviz_pca_var(insc2_num.pca, col.var = "contrib")
 ```
