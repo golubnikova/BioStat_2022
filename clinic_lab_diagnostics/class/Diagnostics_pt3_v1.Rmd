@@ -1,0 +1,133 @@
+---
+title: "Diagnostics_Pt3"
+author: "Glazkov A.A."
+date: "2022-10-09"
+output: 
+   html_document:
+       toc: true
+       toc_float:
+           collapsed: false
+           smooth_scroll: true
+       theme: flatly
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(pROC)
+library(gtsummary)
+
+```
+
+# Работа с данными arteries_data
+
+## Загрузка данных
+
+Загружаем наш датасет
+
+```{r}
+
+arteries_data <- read.csv("arterial_occlusion_data.csv")
+
+arteries_data %>% glimpse()
+
+```
+
+Скорректируем переменные, которые должны быть факторами
+
+```{r}
+
+arteries_data <- arteries_data %>% 
+    mutate(across(c(Arterial_occlusion, Side), ~ as.factor(.x)))
+
+arteries_data %>% glimpse()
+
+```
+
+## Сравнение показателей в двух группах
+
+Сравним показатели у пациентов, у которых есть окклюзия и у пациентов, у которых нет окклюзии
+
+```{r}
+
+arteries_data %>% 
+    tbl_summary(by = Arterial_occlusion) %>% 
+    add_p()
+
+```
+
+# Анализ ROC-кривых
+
+Проведём ROC-анализ для показателя SAP
+
+```{r}
+
+roc_curve_1 <- roc(Arterial_occlusion ~ SAP, data = arteries_data)
+
+roc_curve_1
+
+```
+Этого мало! Давайте хотя бы добавим CI
+
+```{r}
+
+roc_curve_1 <- roc(Arterial_occlusion ~ SAP, data = arteries_data, ci = T)
+
+roc_curve_1
+
+```
+
+Давайте нарисуем ROC-кривую
+
+```{r, fig.height= 3, fig.width=3, dpi=300}
+
+ggroc(roc_curve_1) + 
+    theme_bw()
+
+```
+
+Как нам посмотреть координаты?
+
+```{r}
+
+roc_curve_1 %>% coords()
+
+```
+
+А как нам выбрать "лучший" порог?
+
+```{r}
+
+roc_curve_1 %>% coords(x = "best", best.method = "closest.topleft")
+
+```
+
+## Можно ли упростить нам жизнь?
+
+```{r}
+
+arteries_data %>% 
+    select(!Side) %>% 
+    pivot_longer(cols = !Arterial_occlusion) %>% 
+    group_by(name) %>% 
+    summarise(AUC = roc(Arterial_occlusion, value, ci = T)$ci[2] %>% round(3),
+              AUC_LCL = roc(Arterial_occlusion, value, ci = T)$ci[1] %>% round(3),
+              AUC_UCL = roc(Arterial_occlusion, value, ci = T)$ci[3] %>% round(3))
+
+```
+
+# Помним про доменные области =)
+
+```{r}
+
+arteries_data %>%
+    mutate(Perf_Cv = (Perf_SD / Perf_M * 100) %>% round(1)) %>% 
+    roc(Arterial_occlusion, Perf_Cv, ci = T)
+
+```
+
+
