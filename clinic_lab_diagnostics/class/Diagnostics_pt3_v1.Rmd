@@ -12,6 +12,8 @@ output:
 ---
 
 ```{r setup, include=FALSE}
+install.packages("pROC")
+install.packages("gtsummary")
 
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -59,6 +61,8 @@ arteries_data %>%
     add_p()
 
 ```
+
+Вывод на основе таблицы: по p-value видим, что показатели статистически значимо различаются, кроме ALT, AST, GGT.
 
 # Анализ ROC-кривых
 
