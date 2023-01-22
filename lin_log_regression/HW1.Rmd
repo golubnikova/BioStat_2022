@@ -1,0 +1,136 @@
+---
+title: "HW1"
+author: "Liliya"
+date: "2023-01-22"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, echo = FALSE, warnings = FALSE, message = FALSE)
+```
+
+## Загркзка библиотек
+```{r}
+#install.packages("faux")
+#install.packages("olsrr")
+library(MASS)
+library(faux)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(faux)
+library(tidyverse)
+library(ggpubr)
+library("olsrr")
+
+```
+
+
+## Задача 1
+*Размер выборки*: s = 100
+*Показатели:*
+- креатинин `k`
+- мочевина `m`
+
+*Выборочные характеристики:*
+Средние значения: 
+- `median(k) = 88.5`
+- `median(m) = 5.4`
+Стандартные отклонения:
+- `sd(k) = 13.25`
+- `sd(m) = 1.45`
+Коэффициент корреляции: `cor(k,m) = 0.6`
+
+
+### Моделируем выборку
+```{r}
+dat <- rnorm_multi(n = 100, 
+                  mu = c(88.5, 5.4),
+                  sd = c(13.25, 1.45),
+                  r = c(0.6), 
+                  varnames = c("k", "m"),
+                  empirical = FALSE)
+```
+
+
+### Оценим получившуюся модель
+```{r}
+summary(dat)
+cor(dat)
+#autoplot(dat)
+```
+
+### Визуализация исходных данных
+```{r}
+#head(dat, 4)
+
+theme_set(theme_pubr())
+ggplot(dat, aes(x = k, y = m)) +
+  geom_point() +
+  stat_smooth()
+
+```
+
+### Построим модель линейной регрессии креатинина k на мочевину m
+```{r}
+# Линейная модель
+model <- lm(m ~ k, data = dat)
+summary(model)
+
+ggplot(dat, aes(k, m)) +
+  geom_point() +
+  stat_smooth(method = lm)
+
+```
+#### Как полученные оценки связаны с выборочными характеристиками (средним, дисперсией, корреляцией) выборки S?
+
+1) Коэффициент детерминации (R-квадрат) — это доля дисперсии зависимой переменной, объясняемая рассматриваемой моделью зависимости, то есть объясняющими переменными. В частности, для модели парной линейной регрессии коэффициент детерминации равен квадрату обычного коэффициента корреляции между y и x. В нашем случае R^2 = 0.3016, а cor(k,m) = 0.6.
+2) Наилучшая прямая линейной регрессии проходит через точку ($\overline{x}$; $\overline{y}$) и имеет угловой коэффициент и свободный член, соответственной:
+
+$\alpha = ($r_{xy}$ * $s_{y}$) / $s_{x}$, где $r_{xy}$ * $s_{y}$ — коэффициент корреляции
+
+$\beta = $\overline{y}$ - $\overline{x}$ * $\alpha
+
+
+### Проверка гипотезы о нормальном распределении остатков
+
+**Гипотеза**
+**H0:** Распределение нормальное.
+
+The type of test to use depends on the number of observations. In general, if you have less than 50 observations, you should use the Shapiro-Wilk test. Otherwise, the Kolmogorov-Smirnov test is better.
+
+```{r}
+ols_test_normality(model)
+```
+*Результат:* 
+The criteria to reject the null hypothesis, and therefore conclude that the data is not normally distributed, depends on the p-value. Typically, if the p-value is <0.05 we reject the null hypothesis.
+
+Так как значения p-value > 0.05, H0 принимается.
+
+
+#### График Q-Q Plot
+```{r}
+ols_plot_resid_qq(model)
+```
+*Результат:*
+Looking at the Q-Q plot above, we see that most of the points are located on the diagonal line. Though the extremes deviate from the line and you might observe an “S”-shape. Therefore, this Q-Q plot is not conclusive regarding the normality of the residuals.
+
+
+#### Box-plot остатков
+```{r}
+ols_plot_resid_box(model)
+```
+*Результат:*
+Looking at the boxplot above, we see that residuals are located around zero and the whiskers are almost of the same size. We might assume that the residuals are normally distributed.
+
+
+
+
+Источники:
+[1] https://handbook.mathpsy.com/?page_id=238 
+[2] https://www.codingprof.com/5-ways-to-check-the-normality-of-residuals-in-r-examples/
+[3] https://milnepublishing.geneseo.edu/natural-resources-biometrics/chapter/chapter-7-correlation-and-simple-linear-regression/
+
