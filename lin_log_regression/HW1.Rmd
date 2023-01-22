@@ -124,7 +124,7 @@ Looking at the Q-Q plot above, we see that most of the points are located on the
 ols_plot_resid_box(model)
 ```
 *Результат:*
-Looking at the boxplot above, we see that residuals are located around zero and the whiskers are almost of the same size. We might assume that the residuals are normally distributed.
+Looking at the boxplot above, we see that residuals are located around zero and the whiskers are almost of the same size. However, there around some outlines. We might assume that the residuals are normally distributed.
 
 
 
