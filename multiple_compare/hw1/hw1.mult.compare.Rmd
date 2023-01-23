@@ -1,0 +1,175 @@
+---
+title: "Практикум по множественным сравнениям"
+author: "Liliya Golubnikova"
+date: "2023-01-23"
+output: html_document
+---
+
+# Задача: оценка среднего роста футболистов, играющих на разных позициях   
+
+```{r setup, include=FALSE}
+#if(!require(devtools)) install.packages("devtools")
+#devtools::install_github("kassambara/ggpubr")
+
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+```
+
+
+## Загрузка и фильтрация данных
+
+```{r}
+soccer_general <- read.csv("../soccer.csv", sep=";")[, 2:6] %>% 
+    mutate(Position = as.factor(Position), 
+    Nationality = as.factor(Nationality), 
+    Age = as.numeric(Age), 
+    Height = as.numeric(Height)
+) %>% 
+filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian")) 
+
+set.seed(1) 
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 150), ] %>% 
+    mutate(Nationality = factor(Nationality))
+
+
+```
+
+
+## Визуализация анализируемых данных
+
+```{r}
+#table(soccer_wrk$Position)
+
+library("ggpubr")
+ggboxplot(soccer_wrk, x = "Position", y = "Height", 
+          color = "Position", palette = c("#00AFBB", "#E7B800", "#00bb0c", "#bb00af"),
+          order = c("Defender", "Forward", "Goalkeeper","Midfielder"),
+          ylab = "Height", xlab = "Position")
+
+
+```
+
+## Pairwise t-test (для независимых групп)  
+
+### Без поправки Бонферрони   
+
+```{r}
+
+pwc <- soccer_wrk %>% 
+  pairwise_t_test(
+    Height ~ Position, pool.sd = FALSE
+    )
+pwc
+
+# Визуализация
+pwc <- pwc %>% add_xy_position(x = "Position", step.increase = 1)
+ggboxplot(soccer_wrk, x = "Position", y = "Height",
+  color = "Position", palette = c("#00AFBB", "#E7B800", "#00bb0c", "#bb00af"),
+  order = c("Defender", "Forward", "Goalkeeper","Midfielder")) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) 
+
+```
+
+
+*Вывод: значимые различия наблюдаются между:*      
+- `Forward` - `Goalkeeper` \(**\)   
+- `Defender` - `Midfielder` \(***\)  
+- `Defender` - `Goalkeeper` \(**\)  
+- `Goalkeeper` - `Midfielder` \(****\)  
+
+
+### C поправкой Бонферрони   
+
+```{r}
+
+pwc <- soccer_wrk %>% 
+  pairwise_t_test(
+    Height ~ Position, pool.sd = FALSE,
+    p.adjust.method = "bonferroni"
+    )
+pwc
+
+# Визуализация
+pwc <- pwc %>% add_xy_position(x = "Position", step.increase = 1)
+ggboxplot(soccer_wrk, x = "Position", y = "Height",
+  color = "Position", palette = c("#00AFBB", "#E7B800", "#00bb0c", "#bb00af"),
+  order = c("Defender", "Forward", "Goalkeeper","Midfielder")) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) 
+
+```
+
+
+*Вывод: значимые различия наблюдаются между:*     
+- `Forward` - `Goalkeeper` \(**\)   
+- `Defender` - `Midfielder` \(**\)   
+- `Defender` - `Goalkeeper` \(**\)   
+- `Goalkeeper` - `Midfielder` \(****\)     
+
+Важно отметить, что уровни значимости у `Defender` и `Midfielder`изменились, без поправки Бонферрони уровень значимости отличий был выше.   
+
+Покрывают ли интервалы реальную разницу между средним ростом? - Да, покрывают.    
+
+
+
+### C поправкой Холма   
+```{r}
+
+pwc <- soccer_wrk %>% 
+  pairwise_t_test(
+    Height ~ Position, pool.sd = FALSE,
+    p.adjust.method = "holm"
+    )
+pwc
+
+# Визуализация
+pwc <- pwc %>% add_xy_position(x = "Position", step.increase = 1)
+ggboxplot(soccer_wrk, x = "Position", y = "Height",
+  color = "Position", palette = c("#00AFBB", "#E7B800", "#00bb0c", "#bb00af"),
+  order = c("Defender", "Forward", "Goalkeeper","Midfielder")) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) 
+
+```
+
+
+*Вывод: значимые различия наблюдаются между:*     
+- `Forward` - `Goalkeeper` \(**\)   
+- `Defender` - `Midfielder` \(***\)   
+- `Defender` - `Goalkeeper` \(**\)   
+- `Goalkeeper` - `Midfielder` \(****\)     
+
+
+
+### C поправкой Бенджамина Хохберга      
+```{r}
+
+pwc <- soccer_wrk %>% 
+  pairwise_t_test(
+    Height ~ Position, pool.sd = FALSE,
+    p.adjust.method = "BH"
+    )
+pwc
+
+# Визуализация
+pwc <- pwc %>% add_xy_position(x = "Position", step.increase = 1)
+ggboxplot(soccer_wrk, x = "Position", y = "Height",
+  color = "Position", palette = c("#00AFBB", "#E7B800", "#00bb0c", "#bb00af"),
+  order = c("Defender", "Forward", "Goalkeeper","Midfielder")) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) 
+
+```
+
+*Вывод: значимые различия наблюдаются между:*    
+- `Forward` - `Goalkeeper` \(***\)   
+- `Defender` - `Midfielder` \(***\)   
+- `Defender` - `Goalkeeper` \(***\)   
+- `Goalkeeper` - `Midfielder` \(****\)     
+
+
+**Общий вывод:**     
+В результате выполнения попарных тестов: без поправок, с поправкой Бонферрони, с поправкой Холма и поправкой Бенджамини-Хохберга, можно сделать вывод, что средний рост футболистов на позициях `Defender`, `Forward`, `Goalkeeper`, `Midfielder` значимо различаются. В зависимости от поправки уровень значимости отличий разный. Самые высокие уровни значимости получились в результате попарного сравнения с поправкой Бенджамина Хохберга. Также отметим, что наибольший уровень значимости во всех тестах был у пары `Goalkeeper` - `Midfielder` (что также видно на графиках).      
+
+
+##### Sources   
+[1] https://www.datanovia.com/en/lessons/pairwise-t-test/   
