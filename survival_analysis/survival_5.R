@@ -4,8 +4,9 @@ library(dplyr)
 
 View(trial)
 
-cuminc(Surv(ttdeath, death_cr) ~ trt, trial) %>%
-  ggcuminc(outcome = "death from cancer") +
+cuminc_object <- cuminc(Surv(ttdeath, death_cr) ~ trt, trial) 
+
+ggcuminc(cuminc_object, outcome = "death from cancer") +
   add_confidence_interval() +
   add_risktable()
 
